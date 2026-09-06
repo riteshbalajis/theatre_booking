@@ -1,0 +1,20 @@
+# Local configuration - may contain passwords/secrets
+config/app.properties
+
+# Generated build/compiled files
+build/
+classes/
+*.class
+
+# IDE/editor files
+.vscode/
+.classpath
+.project
+.settings/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

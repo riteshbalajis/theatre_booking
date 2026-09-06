@@ -1,0 +1,31 @@
+# Movie Booking System - example configuration
+# Copy this file to app.properties and replace placeholder values.
+
+# --- Database ---
+db.url=jdbc:mysql://localhost:3306/movie_booking?useSSL=false&allowPublicKeyRetrieval=true&connectionTimeZone=SERVER&preserveInstants=false&rewriteBatchedStatements=true
+db.user=root
+db.password=YOUR_DATABASE_PASSWORD
+
+db.pool.size=20
+db.pool.borrowTimeoutMillis=10000
+
+# --- HTTP server ---
+server.port=8080
+server.threads=32
+server.webRoot=webapp
+
+# --- Booking rules ---
+booking.holdMinutes=8
+booking.maxSeatsPerBooking=10
+booking.sweepIntervalSeconds=60
+
+# --- Sessions ---
+session.timeoutMinutes=120
+
+# --- Transactions ---
+tx.maxAttempts=3
+tx.retryBaseDelayMillis=40
+
+# --- First-run administrator ---
+admin.email=YOUR_ADMIN_EMAIL
+admin.password=YOUR_ADMIN_PASSWORD

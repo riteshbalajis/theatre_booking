@@ -43,6 +43,11 @@ public class ShowServlet extends HttpServlet {
             throws IOException {
         try {
             String path = request.getPathInfo();
+            if (isCollectionPath(path)) {
+                writeJson(response, HttpServletResponse.SC_OK,
+                        showResponses(showService.getAllShows()));
+                return;
+            }
             if (path != null && path.matches("/movie/[0-9]+/date/[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
                 int movieId = parsePositiveId(path.substring(7, path.indexOf("/date/")), "Movie ID");
                 LocalDate date = parseDate(path.substring(path.indexOf("/date/") + 6));

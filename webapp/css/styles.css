@@ -1,0 +1,87 @@
+:root {
+  --ink: #1d2a35;
+  --muted: #687781;
+  --line: #dbe4e7;
+  --paper: #f7faf9;
+  --white: #ffffff;
+  --teal: #176b6b;
+  --teal-dark: #0f4f51;
+  --coral: #dc6c52;
+  --soft-teal: #e6f2f0;
+  --soft-coral: #fff0eb;
+  --shadow: 0 12px 30px rgba(29, 42, 53, .08);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: var(--paper); font: 16px/1.5 Georgia, 'Times New Roman', serif; }
+button, input, select, textarea { font: inherit; }
+a { color: var(--teal-dark); }
+.site-header { background: var(--white); border-bottom: 1px solid var(--line); }
+.navbar { max-width: 1180px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: center; gap: 26px; }
+.brand { color: var(--ink); font: 700 1.25rem/1 'Trebuchet MS', sans-serif; text-decoration: none; letter-spacing: .02em; }
+.nav-links { margin-left: auto; display: flex; align-items: center; gap: 18px; font: 600 .92rem 'Trebuchet MS', sans-serif; }
+.nav-links a { text-decoration: none; color: var(--muted); }
+.nav-links a:hover, .text-link:hover { color: var(--teal); }
+.nav-user { color: var(--teal-dark); font-weight: 700; }
+.page-shell { max-width: 1180px; margin: 0 auto; padding: 42px 24px 72px; }
+.hero-band { min-height: 330px; padding: 56px clamp(28px, 7vw, 92px); display: flex; align-items: center; background: linear-gradient(115deg, #dcefeb 0%, #f7eee8 100%); border-bottom: 4px solid var(--coral); }
+.hero-band h1 { max-width: 650px; margin: 8px 0 14px; font-size: clamp(2.25rem, 5vw, 4.5rem); line-height: .98; font-weight: 500; }
+.hero-copy { max-width: 520px; color: var(--muted); font-size: 1.1rem; }
+.eyebrow { margin: 0; color: var(--coral); font: 700 .76rem/1.2 'Trebuchet MS', sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+h1, h2, h3 { font-weight: 500; }
+h1 { margin: 8px 0 10px; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.05; }
+h2 { margin: 0; font-size: 2rem; }
+h3 { margin: 0; font-size: 1.25rem; }
+.section-heading { margin: 44px 0 22px; display: flex; justify-content: space-between; align-items: end; gap: 24px; }
+.page-heading { margin: 0 0 30px; }
+.text-link { font: 700 .9rem 'Trebuchet MS', sans-serif; text-decoration: none; }
+.button { border: 0; border-radius: 3px; padding: 12px 19px; color: var(--white); background: var(--teal); cursor: pointer; font: 700 .9rem 'Trebuchet MS', sans-serif; text-decoration: none; display: inline-block; }
+.button:hover { background: var(--teal-dark); }
+.button:disabled { opacity: .5; cursor: not-allowed; }
+.button-light { color: var(--ink); background: var(--white); }
+.button-light:hover { background: var(--soft-teal); }
+.button-small { padding: 9px 14px; }
+.muted { color: var(--muted); }
+.movie-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px; }
+.movie-card { min-height: 310px; display: flex; flex-direction: column; background: var(--white); box-shadow: var(--shadow); border: 1px solid var(--line); }
+.poster-placeholder { min-height: 145px; padding: 18px; display: flex; align-items: end; color: var(--white); background: var(--teal); font-size: 1.5rem; }
+.movie-card:nth-child(3n) .poster-placeholder { background: var(--coral); }
+.movie-card:nth-child(3n+2) .poster-placeholder { background: #376b77; }
+.movie-card-body { padding: 18px; display: flex; flex: 1; flex-direction: column; }
+.movie-meta { margin: 8px 0 16px; color: var(--muted); font: .86rem/1.6 'Trebuchet MS', sans-serif; }
+.movie-description { margin: 0 0 18px; color: var(--muted); font-size: .95rem; }
+.movie-card .button { margin-top: auto; text-align: center; }
+.auth-shell { min-height: calc(100vh - 78px); padding: 50px 24px; display: grid; place-items: start center; }
+.form-panel { width: min(100%, 480px); padding: 38px; background: var(--white); box-shadow: var(--shadow); border-top: 4px solid var(--coral); }
+.stack-form { display: grid; gap: 17px; margin-top: 28px; }
+label { display: grid; gap: 7px; color: var(--ink); font: 700 .82rem 'Trebuchet MS', sans-serif; }
+input, select, textarea { width: 100%; padding: 11px 12px; color: var(--ink); background: var(--white); border: 1px solid #bdcdd1; border-radius: 3px; }
+textarea { min-height: 92px; resize: vertical; }
+small { color: var(--muted); font-weight: 400; }
+.form-footer { margin: 24px 0 0; color: var(--muted); text-align: center; }
+.message { min-height: 24px; margin: 12px 0; color: var(--muted); font-family: 'Trebuchet MS', sans-serif; font-size: .9rem; }
+.message.error { color: #a53d2f; }.message.success { color: var(--teal-dark); }
+.search-form { display: flex; gap: 8px; width: min(100%, 390px); }
+.detail-layout { padding: 28px 0 40px; display: grid; grid-template-columns: 240px 1fr; gap: 32px; border-bottom: 1px solid var(--line); }
+.detail-poster { min-height: 280px; padding: 22px; display: flex; align-items: end; background: var(--teal); color: var(--white); font-size: 1.8rem; }
+.detail-copy p { max-width: 680px; color: var(--muted); }
+.date-picker { min-width: 180px; }
+.show-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
+.show-card { padding: 18px; background: var(--white); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.show-time { display: block; margin: 5px 0; font-size: 1.45rem; }
+.show-card small { display: block; margin-bottom: 14px; font-family: 'Trebuchet MS', sans-serif; }
+.seat-layout { display: grid; grid-template-columns: 1fr 280px; gap: 28px; align-items: start; }
+.seat-panel, .booking-summary, .admin-workspace { padding: 26px; background: var(--white); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.screen-label { max-width: 530px; margin: 0 auto 26px; padding: 8px; color: var(--muted); border-top: 3px solid var(--teal); text-align: center; font: 700 .75rem 'Trebuchet MS', sans-serif; letter-spacing: .18em; }
+.seat-map { display: grid; gap: 10px; overflow-x: auto; }
+.seat-row { display: flex; align-items: center; gap: 8px; min-width: max-content; }
+.row-label { width: 25px; color: var(--muted); font: 700 .8rem 'Trebuchet MS', sans-serif; }
+.seat { width: 38px; height: 34px; padding: 0; border: 1px solid var(--teal); border-radius: 3px; color: var(--teal-dark); background: var(--soft-teal); cursor: pointer; font: 700 .75rem 'Trebuchet MS', sans-serif; }
+.seat.selected { color: var(--white); background: var(--coral); border-color: var(--coral); }.seat.booked { color: #99a4a6; background: #edf0f0; border-color: #d6dddd; cursor: not-allowed; }
+.legend { display: flex; justify-content: center; gap: 18px; margin-top: 26px; color: var(--muted); font: .8rem 'Trebuchet MS', sans-serif; }
+.legend span { display: flex; gap: 6px; align-items: center; }.seat-dot { width: 12px; height: 12px; display: inline-block; background: var(--soft-teal); border: 1px solid var(--teal); }.seat-dot.selected { background: var(--coral); border-color: var(--coral); }.seat-dot.booked { background: #edf0f0; border-color: #d6dddd; }
+.booking-summary { position: sticky; top: 20px; }.summary-total { display: flex; justify-content: space-between; padding: 18px 0; margin: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-family: 'Trebuchet MS', sans-serif; }.summary-total strong { color: var(--teal-dark); }
+.booking-list { display: grid; gap: 16px; }.booking-card { padding: 22px; background: var(--white); border: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 12px 25px; }.booking-card p { margin: 4px 0; color: var(--muted); font-family: 'Trebuchet MS', sans-serif; font-size: .9rem; }.status { color: var(--teal-dark); font-weight: 700; }.status.cancelled { color: var(--coral); }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 18px; }.tab { padding: 11px 16px; border: 1px solid var(--line); background: var(--white); color: var(--muted); cursor: pointer; font: 700 .82rem 'Trebuchet MS', sans-serif; }.tab.active { color: var(--white); background: var(--teal); border-color: var(--teal); }
+.admin-workspace { overflow-x: auto; }.admin-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; }.admin-table { width: 100%; border-collapse: collapse; font: .9rem 'Trebuchet MS', sans-serif; }.admin-table th, .admin-table td { padding: 12px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }.admin-table th { color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }.admin-actions { display: flex; gap: 7px; flex-wrap: wrap; }.danger { color: #a53d2f; border-color: #e8b8ae; background: var(--soft-coral); }.admin-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; padding: 18px 0; border-bottom: 1px solid var(--line); }.admin-form .wide { grid-column: 1 / -1; }.admin-form .form-actions { align-self: end; display: flex; gap: 8px; }
+@media (max-width: 700px) { .navbar { padding: 15px 16px; flex-wrap: wrap; gap: 14px; }.nav-links { width: 100%; margin-left: 0; justify-content: space-between; gap: 8px; }.page-shell { padding: 28px 16px 50px; }.hero-band { margin: -28px -16px 0; min-height: 390px; padding: 45px 25px; }.section-heading { align-items: start; flex-direction: column; }.search-form { width: 100%; }.detail-layout, .seat-layout { grid-template-columns: 1fr; }.detail-poster { min-height: 180px; }.booking-summary { position: static; }.booking-card { grid-template-columns: 1fr; }.form-panel { padding: 28px 22px; }.admin-workspace { padding: 18px; } }

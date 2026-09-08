@@ -7,8 +7,8 @@ import java.sql.SQLException;
 public final class DBConnection {
     private static final String URL = "jdbc:mysql://localhost:3306/movie_booking"
             + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" ;
-    private static final String USER = getEnvironmentValue("MOVIE_DB_USER", "root");
-    private static final String PASSWORD = getEnvironmentValue("MOVIE_DB_PASSWORD", "Sql1234@");
+    private static final String USER = getEnvironmentValue("MOVIE_DB_USER", "****");
+    private static final String PASSWORD = getEnvironmentValue("MOVIE_DB_PASSWORD", "****");
 
     private DBConnection() {
         // Utility class.

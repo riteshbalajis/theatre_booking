@@ -228,6 +228,17 @@ async function cancelBooking(id) { if (!window.confirm('Cancel this booking?')) 
 const ADMIN_CONFIG = {
   movies: {
     title: 'Movies', endpoint: '/api/movies', id: 'movieId',
+
+    /*Property: title
+    Label: Title
+    Input type: text
+    Required: true-> requried false-> optional
+
+    fields-> tells about the forms that is asked to add movie,threte..
+    columns-> tells about the columns that is displayed in the table 
+    */
+
+    
     fields: [['title', 'Title', 'text', true], ['description', 'Description', 'textarea', false], ['durationMinutes', 'Duration (minutes)', 'number', true], ['language', 'Language', 'text', true], ['genre', 'Genre', 'text', false], ['releaseDate', 'Release date', 'date', false]],
     columns: [['title', 'Title'], ['genre', 'Genre'], ['language', 'Language'], ['durationMinutes', 'Minutes'], ['status', 'Status']]
   },

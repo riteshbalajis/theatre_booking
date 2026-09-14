@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screenly | Payment</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="payment">
+  <div id="site-header"></div>
+
+  <main class="auth-shell">
+    <section class="form-panel">
+      <p class="eyebrow">Confirm booking</p>
+      <h1>Complete your booking</h1>
+      <p class="muted">
+        Enter your 4-digit payment PIN to complete payment and confirm your selected seats.
+      </p>
+
+      <div class="booking-summary-card">
+        <div class="summary-row">
+          <span class="muted">Booking ID</span>
+          <strong id="booking-id">Loading...</strong>
+        </div>
+        <div class="summary-row">
+          <span class="muted">Total Payable</span>
+          <strong class="price-highlight">₹<span id="booking-amount">0.00</span></strong>
+        </div>
+        <div class="summary-row timer-row">
+          <span class="muted">Time remaining</span>
+          <span id="countdown" class="countdown-badge">02:00</span>
+        </div>
+      </div>
+
+      <form id="payment-form" class="stack-form">
+        <label>
+          Payment PIN
+          <input
+            id="payment-pin"
+            name="pin"
+            type="password"
+            inputmode="numeric"
+            maxlength="4"
+            pattern="[0-9]{4}"
+            placeholder="Enter 4-digit PIN (e.g. 1234)"
+            autocomplete="off"
+            required>
+        </label>
+
+        <div id="payment-message" class="message" role="alert"></div>
+
+        <button id="payment-button" class="button button-block" type="submit">
+          Pay & Confirm Booking
+        </button>
+      </form>
+
+      <p class="form-footer">
+        <a href="bookings.html">Go to my bookings</a>
+      </p>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

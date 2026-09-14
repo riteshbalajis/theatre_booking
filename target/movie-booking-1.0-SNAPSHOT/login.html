@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Screenly | Login</title><link rel="stylesheet" href="css/styles.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body data-page="login">
+  <div id="site-header"></div>
+  
+<main class="auth-shell">
+    <section class="form-panel">
+
+        <p class="eyebrow">Welcome back</p>
+
+        <h1>Log in to Screenly</h1>
+
+        <p class="muted">
+            Use your account to book seats and manage your bookings.
+        </p>
+
+        <!-- Normal email/password login -->
+        <form id="login-form" class="stack-form">
+
+            <label>
+                Email
+                <input name="email"
+                       type="email"
+                       autocomplete="email"
+                       required>
+            </label>
+
+            <label>
+                Password
+                <input name="password"
+                       type="password"
+                       autocomplete="current-password"
+                       required>
+            </label>
+
+            <p class="form-footer">
+                <a href="forget_password.html" id="forgot-password-link">Forgot your password?</a>
+            </p>
+
+            <div id="form-message"
+                 class="message"
+                 role="alert">
+            </div>
+
+            <button class="button" type="submit">
+                Log in
+            </button>
+
+        </form>
+
+        <!-- Separator -->
+        <p class="muted" style="text-align:center; margin:20px 0;">
+            OR
+        </p>
+
+        <!-- Google Sign-In -->
+        <div id="g_id_onload"
+             data-client_id="272663743548-itpthoqm2u1uik1kfe77aa13ts49omva.apps.googleusercontent.com"
+             data-callback="handleGoogleLogin">
+        </div>
+
+        <div class="g_id_signin"
+             data-type="standard"
+             data-size="large"
+             data-theme="outline"
+             data-text="signin_with"
+             data-shape="rectangular">
+        </div>
+
+        <p class="form-footer">
+            New here?
+            <a href="register.html">Create an account</a>
+        </p>
+
+    </section>
+</main>
+
+
+  <script src="js/api.js"></script><script src="js/common.js"></script><script src="js/app.js"></script>
+</body></html>

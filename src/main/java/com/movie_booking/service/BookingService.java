@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.List;
 
+import com.movie_booking.dto.request.RazorpayPaymentRequest;
+import com.movie_booking.dto.response.RazorpayOrderResponse;
 import com.movie_booking.model.Booking;
 import com.movie_booking.model.BookingSeat;
 import com.movie_booking.model.BookingStatus;
@@ -46,4 +48,11 @@ public interface BookingService {
     void cleanupExpiredBookingsAndHolds();
 
     void confirmPayment(int authenticatedUserId, int bookingId, String pin) throws SQLException;
+    RazorpayOrderResponse createRazorpayOrder(int authenticatedUserId, int bookingId)
+        throws SQLException;
+
+    public void verifyRazorpayPayment(int authenticatedUserId,int bookingId,RazorpayPaymentRequest request)
+        throws SQLException;
+
+
 }

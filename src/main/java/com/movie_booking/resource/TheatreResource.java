@@ -41,6 +41,7 @@ public class TheatreResource {
         this.theatreService = new TheatreServiceImpl();
     }
 
+    
     @GET
     @Path("/")
     public List<TheatreResponse> getTheatres(
@@ -102,14 +103,6 @@ public class TheatreResource {
         }
         return Response.ok(new MessageResponse("Theatre deleted successfully.")).build();
     }
-
-
-
-
-
-
-
-
 
     @Context
     private HttpServletRequest httpRequest;

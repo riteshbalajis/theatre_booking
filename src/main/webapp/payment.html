@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Screenly | Payment</title>
   <link rel="stylesheet" href="css/styles.css">
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body data-page="payment">
   <div id="site-header"></div>
@@ -14,7 +16,7 @@
       <p class="eyebrow">Confirm booking</p>
       <h1>Complete your booking</h1>
       <p class="muted">
-        Enter your 4-digit payment PIN to complete payment and confirm your selected seats.
+        Pay securely with Razorpay to confirm your tickets.
       </p>
 
       <div class="booking-summary-card">
@@ -32,30 +34,19 @@
         </div>
       </div>
 
-      <form id="payment-form" class="stack-form">
-        <label>
-          Payment PIN
-          <input
-            id="payment-pin"
-            name="pin"
-            type="password"
-            inputmode="numeric"
-            maxlength="4"
-            pattern="[0-9]{4}"
-            placeholder="Enter 4-digit PIN (e.g. 1234)"
-            autocomplete="off"
-            required>
-        </label>
+      <div id="payment-message" class="message" role="alert"></div>
 
-        <div id="payment-message" class="message" role="alert"></div>
-
-        <button id="payment-button" class="button button-block" type="submit">
-          Pay & Confirm Booking
+      <div class="payment-actions" style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <button id="pay-razorpay-btn" class="button button-block" type="button">
+          Pay with Razorpay
         </button>
-      </form>
+        <button id="cancel-payment-btn" class="button button-block danger" type="button">
+          Cancel Booking
+        </button>
+      </div>
 
       <p class="form-footer">
-        <a href="bookings.html">Go to my bookings</a>
+        <a href="index.html">Cancel &amp; return to home</a>
       </p>
     </section>
   </main>

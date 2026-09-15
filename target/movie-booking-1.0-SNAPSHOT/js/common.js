@@ -1,3 +1,6 @@
+
+let currentUser = null;
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 }
@@ -16,25 +19,55 @@ function saveUser(user) { sessionStorage.setItem('screenlyUser', JSON.stringify(
 function clearUser() { sessionStorage.removeItem('screenlyUser'); }
 function requireLogin() { if (!getSavedUser()) { window.location.href = 'login.html'; return false; } return true; }
 
+function getTotpStatus(userId) {
+  return localStorage.getItem(`screenly_totp_${userId}`);
+}
+function setTotpStatus(userId, status) {
+  if (status) {
+    localStorage.setItem(`screenly_totp_${userId}`, status);
+  } else {
+    localStorage.removeItem(`screenly_totp_${userId}`);
+  }
+}
+
 function renderHeader() {
   const target = qs('#site-header');
   if (!target) return;
-  const user = getSavedUser();
+  const user = currentUser;
   target.className = 'site-header';
   target.innerHTML = `<header class="navbar"><a class="brand" href="index.html">SCREENLY</a>
   <nav class="nav-links"><a href="movies.html">Movies</a>
-  ${user ? '<a href="bookings.html">My bookings</a>' : ''}
+  ${user ? '<a href="bookings.html">My bookings</a><a href="settings.html">Settings</a>' : ''}
   ${user && user.role === 'ADMIN' ? '<a href="admin.html">Admin</a>' : ''}
   ${user ? `<span class="nav-user">${escapeHtml(user.name)}</span>
-  <a href="#" data-logout>Log out</a>` : '<a href="login.html">Log in</a><a class="button button-small" href="register.html">Register</a>'}</nav></header>`;
+  <a href="#" data-logout>Log out</a>` : '<a href="login.html">Log in</a><a class="button button-small register-button" href="register.html">Register</a>'}</nav></header>`;
   const logout = qs('[data-logout]', target);
-  if (logout) logout.addEventListener('click', async event => { event.preventDefault(); try { await API.post('/api/auth/logout'); } catch (error) { /* Session may already be gone. */ } clearUser(); window.location.href = 'index.html'; });
+  if (logout) logout.addEventListener('click', async event => { 
+    event.preventDefault(); 
+    try { 
+      await API.post('/api/auth/logout'); 
+    } 
+    catch (error) 
+    { /* Session may already be gone. */ } 
+    currentUser = null;
+    window.location.href = 'index.html'; });
 }
 
-function requireAdmin() 
-{ const user = getSavedUser(); 
-    if (!user || user.role !== 'ADMIN') { 
-        window.location.href = 'login.html'; 
-        return false; 
-    } return true; 
+async function loadCurrentUser() {
+    try {
+        currentUser = await API.get('/api/auth/session');
+        return currentUser;
+    } catch (error) {
+        currentUser = null;
+        return null;
+    }
+}
+
+function requireLogin() {
+    if (!currentUser) {
+        window.location.href = 'login.html';
+        return false;
+    }
+
+    return true;
 }

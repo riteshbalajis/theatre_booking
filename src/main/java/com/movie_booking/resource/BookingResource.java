@@ -19,10 +19,12 @@ import javax.ws.rs.core.Response;
 
 import com.movie_booking.dto.request.BookTicketsRequest;
 import com.movie_booking.dto.request.PaymentRequest;
+import com.movie_booking.dto.request.RazorpayPaymentRequest;
 import com.movie_booking.dto.response.BookingCreatedResponse;
 import com.movie_booking.dto.response.BookingResponse;
 import com.movie_booking.dto.response.BookingSeatResponse;
 import com.movie_booking.dto.response.MessageResponse;
+import com.movie_booking.dto.response.RazorpayOrderResponse;
 import com.movie_booking.exception.ResourceNotFoundException;
 import com.movie_booking.exception.UnauthorizedException;
 import com.movie_booking.model.Booking;
@@ -110,6 +112,30 @@ public class BookingResource {
                     .entity(new MessageResponse(exception.getMessage()))
                     .build();
         }
+    }
+
+    @POST
+    @Path("/{bookingId}/razorpay_order")
+    public RazorpayOrderResponse createRazorpayOrder(
+            @PathParam("bookingId") int bookingId) throws SQLException {
+
+        int userId = getAuthenticatedUserId();
+
+        return bookingService.createRazorpayOrder(userId, bookingId);
+    }
+
+    @POST
+    @Path("/{bookingId}/razorpay_verify")
+    public void verifyRazorpayPayment(
+            @PathParam("bookingId") int bookingId,
+            RazorpayPaymentRequest request) throws SQLException {
+
+        int userId = getAuthenticatedUserId();
+
+        bookingService.verifyRazorpayPayment(
+                userId,
+                bookingId,
+                request);
     }
 
     @DELETE

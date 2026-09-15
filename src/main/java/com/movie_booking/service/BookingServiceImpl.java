@@ -18,6 +18,8 @@ import com.movie_booking.dao.ShowDao;
 import com.movie_booking.dao.ShowDaoImpl;
 import com.movie_booking.dao.ShowSeatDao;
 import com.movie_booking.dao.ShowSeatDaoImpl;
+import com.movie_booking.dto.request.RazorpayPaymentRequest;
+import com.movie_booking.dto.response.RazorpayOrderResponse;
 import com.movie_booking.model.Booking;
 import com.movie_booking.model.BookingSeat;
 import com.movie_booking.model.BookingStatus;
@@ -25,6 +27,10 @@ import com.movie_booking.model.Show;
 import com.movie_booking.model.ShowSeat;
 import com.movie_booking.model.ShowStatus;
 import com.movie_booking.util.DBConnection;
+import com.movie_booking.util.RazorpayConfig;
+import com.razorpay.Order;
+import com.razorpay.RazorpayClient;
+import com.razorpay.Utils;
 
 public class BookingServiceImpl implements BookingService {
     private final BookingDao bookingDao;
@@ -291,6 +297,188 @@ public class BookingServiceImpl implements BookingService {
             } catch (SQLException | RuntimeException exception) {
                 rollback(connection, exception);
                 throw exception;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+        }
+    }
+
+    @Override
+    public RazorpayOrderResponse createRazorpayOrder(
+            int authenticatedUserId, int bookingId) throws SQLException {
+
+        requireAuthenticatedUser(authenticatedUserId);
+        requirePositiveId(bookingId, "Booking ID");
+
+        Booking booking = bookingDao.findById(bookingId);
+
+        if (booking == null) {
+            throw new IllegalArgumentException("Booking not found.");
+        }
+
+        if (booking.getUserId() != authenticatedUserId) {
+            throw new IllegalArgumentException("You cannot access this booking.");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Booking is not pending payment.");
+        }
+
+        if (booking.getHoldUntil() == null
+                || !booking.getHoldUntil().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException(
+                    "Payment time has expired.");
+        }
+
+        try {
+            RazorpayClient razorpayClient = new RazorpayClient(
+                    RazorpayConfig.getKeyId(),
+                    RazorpayConfig.getKeySecret());
+
+            long amountInPaise = booking.getTotalAmount()
+                    .multiply(BigDecimal.valueOf(100))
+                    .longValueExact();
+
+            org.json.JSONObject orderRequest = new org.json.JSONObject();
+
+            orderRequest.put("amount", amountInPaise);
+            orderRequest.put("currency", "INR");
+            orderRequest.put("receipt", "booking_" + bookingId);
+
+            Order order = razorpayClient.orders.create(orderRequest);
+
+            return new RazorpayOrderResponse(
+                    bookingId,
+                    order.get("id"),
+                    RazorpayConfig.getKeyId(),
+                    booking.getTotalAmount(),
+                    "INR");
+
+        } catch (Exception exception) {
+            throw new SQLException(
+                    "Unable to create Razorpay order.",
+                    exception);
+        }
+    }
+
+    @Override
+    public void verifyRazorpayPayment(int authenticatedUserId, int bookingId, RazorpayPaymentRequest request)
+            throws SQLException {
+
+        requireAuthenticatedUser(authenticatedUserId);
+        requirePositiveId(bookingId, "Booking ID");
+
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Payment verification data is required.");
+        }
+
+        if (request.getRazorpayPaymentId() == null
+                || request.getRazorpayPaymentId().trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Razorpay payment ID is required.");
+        }
+
+        if (request.getRazorpayOrderId() == null
+                || request.getRazorpayOrderId().trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Razorpay order ID is required.");
+        }
+
+        if (request.getRazorpaySignature() == null
+                || request.getRazorpaySignature().trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Razorpay signature is required.");
+        }
+
+        Booking booking = bookingDao.findById(bookingId);
+
+        if (booking == null) {
+            throw new IllegalArgumentException("Booking not found.");
+        }
+
+        if (booking.getUserId() != authenticatedUserId) {
+            throw new IllegalArgumentException(
+                    "You cannot access this booking.");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Booking is not pending payment.");
+        }
+
+        try {
+            String payload
+                    = request.getRazorpayOrderId()
+                    + "|"
+                    + request.getRazorpayPaymentId();
+
+            Utils.verifySignature(
+                    payload,
+                    request.getRazorpaySignature(),
+                    RazorpayConfig.getKeySecret());
+
+        } catch (Exception exception) {
+            throw new IllegalArgumentException(
+                    "Invalid Razorpay payment signature.",
+                    exception);
+        }
+
+        try (Connection connection = DBConnection.getConnection()) {
+            connection.setAutoCommit(false);
+
+            try {
+                Booking currentBooking = bookingDao.findById(connection, bookingId);
+
+                if (currentBooking == null) {
+                    throw new IllegalArgumentException("Booking not found.");
+                }
+
+                if (currentBooking.getUserId() != authenticatedUserId) {
+                    throw new IllegalArgumentException(
+                            "You cannot access this booking.");
+                }
+
+                if (currentBooking.getStatus() != BookingStatus.PENDING) {
+                    throw new IllegalStateException(
+                            "Booking is not pending payment.");
+                }
+
+                if (currentBooking.getHoldUntil() == null
+                        || !currentBooking.getHoldUntil().isAfter(LocalDateTime.now())) {
+                    throw new IllegalStateException(
+                            "Payment time has expired.");
+                }
+
+                List<BookingSeat> bookingSeats
+                        = bookingSeatDao.findByBookingId(connection, bookingId);
+
+                for (BookingSeat bookingSeat : bookingSeats) {
+                    if (!showSeatDao.confirmHeldSeat(
+                            connection,
+                            bookingSeat.getShowSeatId(),
+                            authenticatedUserId)) {
+
+                        throw new IllegalStateException(
+                                "One or more seats are no longer available.");
+                    }
+                }
+
+                boolean confirmed
+                        = bookingDao.confirmBooking(connection, bookingId);
+
+                if (!confirmed) {
+                    throw new IllegalStateException(
+                            "Booking could not be confirmed.");
+                }
+
+                connection.commit();
+
+            } catch (SQLException | RuntimeException exception) {
+                rollback(connection, exception);
+                throw exception;
+
             } finally {
                 connection.setAutoCommit(true);
             }

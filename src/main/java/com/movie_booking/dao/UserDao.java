@@ -40,5 +40,22 @@ public interface UserDao {
 
     boolean updatePassword(Connection connection,int userId,String passwordHash) throws SQLException;
 
+    boolean isTotpEnabled(int userId) throws SQLException;
+
+    String getTotpSecret(int userId) throws SQLException;
+
+    boolean saveTotpSecret(int userId, String secret)
+        throws SQLException;
+
+    boolean enableTotp(int userId) throws SQLException;
+
+    boolean disableTotp(int userId) throws SQLException;
+
+    boolean regenerateTotpSecret(int userId,String newSecret) throws SQLException;
+
+
+
+
+
 
 }

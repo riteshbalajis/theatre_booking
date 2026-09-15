@@ -95,6 +95,143 @@ public class UserDaoImpl implements UserDao {
         }
     }
 
+    //totp methods 
+    @Override
+    public boolean isTotpEnabled(int userId) throws SQLException {
+
+        String sql
+                = "SELECT totp_enabled "
+                + "FROM users "
+                + "WHERE user_id = ?";
+
+        try (
+                Connection connection = DBConnection.getConnection(); PreparedStatement statement
+                = connection.prepareStatement(sql)) {
+
+            statement.setInt(1, userId);
+
+            try (ResultSet rs = statement.executeQuery()) {
+
+                if (rs.next()) {
+                    return rs.getBoolean("totp_enabled");
+                }
+
+                return false;
+            }
+        }
+    }
+
+    @Override
+    public String getTotpSecret(int userId) throws SQLException {
+
+        String sql
+                = "SELECT totp_secret "
+                + "FROM users "
+                + "WHERE user_id = ?";
+
+        try (
+                Connection connection = DBConnection.getConnection(); PreparedStatement statement
+                = connection.prepareStatement(sql)) {
+
+            statement.setInt(1, userId);
+
+            try (ResultSet rs = statement.executeQuery()) {
+
+                if (rs.next()) {
+                    return rs.getString("totp_secret");
+                }
+
+                return null;
+            }
+        }
+    }
+
+    @Override
+    public boolean saveTotpSecret(int userId, String secret
+    ) throws SQLException {
+
+        String sql
+                = "UPDATE users "
+                + "SET totp_secret = ? "
+                + "WHERE user_id = ? "
+                + "AND totp_enabled = FALSE";
+
+        try (
+                Connection connection = DBConnection.getConnection(); PreparedStatement statement
+                = connection.prepareStatement(sql)) {
+
+            statement.setString(1, secret);
+            statement.setInt(2, userId);
+
+            return statement.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean regenerateTotpSecret(
+            int userId,
+            String newSecret
+    ) throws SQLException {
+
+        String sql
+                = "UPDATE users "
+                + "SET totp_secret = ?, "
+                + "    totp_enabled = FALSE "
+                + "WHERE user_id = ? "
+                + "AND totp_enabled = TRUE "
+                + "AND totp_secret IS NOT NULL";
+
+        try (
+                Connection connection = DBConnection.getConnection(); PreparedStatement statement
+                = connection.prepareStatement(sql)) {
+
+            statement.setString(1, newSecret);
+            statement.setInt(2, userId);
+
+            return statement.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean enableTotp(int userId) throws SQLException {
+
+        String sql
+                = "UPDATE users "
+                + "SET totp_enabled = TRUE "
+                + "WHERE user_id = ? "
+                + "AND totp_secret IS NOT NULL "
+                + "AND totp_enabled = FALSE";
+
+        try (
+                Connection connection = DBConnection.getConnection(); PreparedStatement statement
+                = connection.prepareStatement(sql)) {
+
+            statement.setInt(1, userId);
+
+            return statement.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean disableTotp(int userId) throws SQLException {
+
+        String sql
+                = "UPDATE users "
+                + "SET totp_enabled = FALSE, "
+                + "    totp_secret = NULL "
+                + "WHERE user_id = ? "
+                + "AND totp_enabled = TRUE";
+
+        try (
+                Connection connection = DBConnection.getConnection(); PreparedStatement statement
+                = connection.prepareStatement(sql)) {
+
+            statement.setInt(1, userId);
+
+            return statement.executeUpdate() > 0;
+        }
+    }
+
     @Override
     public boolean existsByEmail(String email) throws SQLException {
         String sql = "SELECT 1 FROM users WHERE email = ? LIMIT 1";
@@ -131,7 +268,7 @@ public class UserDaoImpl implements UserDao {
     }
 
     @Override
-    public boolean updatePassword(Connection connection,int userId,String passwordHash) throws SQLException {
+    public boolean updatePassword(Connection connection, int userId, String passwordHash) throws SQLException {
 
         String sql
                 = "UPDATE users "

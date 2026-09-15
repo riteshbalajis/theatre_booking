@@ -1,21 +1,30 @@
-document.addEventListener('DOMContentLoaded', () => {
-  renderHeader();
-  const page = document.body.dataset.page;
-  const handlers = {
-    home: loadHome,
-    movies: loadMoviesPage,
-    login: setupLogin,
-    register: setupRegister,
-    forgot_password: setupForgetPassword,
-    forget_password: setupForgetPassword,
-    details: loadDetails,
-    seats: loadSeats,
-    bookings: loadBookings,
-    payment: setupPayment,
-    admin: loadAdmin,
-    ticket_view: loadTicketView
-  };
-  if (handlers[page]) handlers[page]();
+document.addEventListener('DOMContentLoaded', async () => {
+
+    await loadCurrentUser();
+
+    renderHeader();
+
+    const page = document.body.dataset.page;
+
+    const handlers = {
+        home: loadHome,
+        movies: loadMoviesPage,
+        login: setupLogin,
+        settings: setupSettings,
+        register: setupRegister,
+        forgot_password: setupForgetPassword,
+        forget_password: setupForgetPassword,
+        details: loadDetails,
+        seats: loadSeats,
+        bookings: loadBookings,
+        payment: setupPayment,
+        admin: loadAdmin,
+        ticket_view: loadTicketView
+    };
+
+    if (handlers[page]) {
+        handlers[page]();
+    }
 });
 
 function movieCard(movie) {
@@ -44,6 +53,14 @@ async function getActiveMovies(keyword = '') {
 async function loadHome() {
   const list = qs('#movie-list');
   const message = qs('#page-message');
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('failed') === '1' || params.get('failure') === '1') {
+    setMessage(message, 'Payment failed. Your booking was not completed. Please select your seats again.', 'error');
+  } else if (params.get('cancelled') === '1' || params.get('cancel') === '1') {
+    setMessage(message, 'Payment was cancelled. Your booking was not completed.', 'error');
+  }
+
   try {
     const movies = await getActiveMovies();
     list.innerHTML = movies.length ? movies.map(movieCard).join('') : '<p class="muted">No active movies are available right now.</p>';
@@ -76,30 +93,413 @@ async function loadMoviesPage() {
 }
 
 function setupLogin() {
-  const form = qs('#login-form');
-  const message = qs('#form-message');
+    const loginSection = qs('#login-section');
+    const form = qs('#login-form');
+    const message = qs('#form-message');
 
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('reset') === 'success') {
-    setMessage(message, 'Password reset successfully! Please log in with your new password.', 'success');
-  } else if (params.get('registered') === '1') {
-    setMessage(message, 'Registration successful! Please log in.', 'success');
-  }
+    const totpSection = qs('#totp-section');
+    const totpForm = qs('#totp-form');
+    const totpCode = qs('#totp-code');
+    const totpMessage = qs('#totp-message');
+    const totpButton = qs('#totp-verify-button');
+    const totpBackButton = qs('#totp-back-button');
 
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    setMessage(message, 'Signing in...');
-    const data = Object.fromEntries(new FormData(form));
-    try {
-      const result = await API.post('/api/auth/login', data);
-      saveUser(result.user);
-      window.location.href = result.user.role === 'ADMIN' ? 'admin.html' : 'index.html';
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('reset') === 'success') {
+        setMessage(
+            message,
+            'Password reset successfully! Please log in with your new password.',
+            'success'
+        );
+    } else if (params.get('registered') === '1') {
+        setMessage(
+            message,
+            'Registration successful! Please log in.',
+            'success'
+        );
     }
-    catch (error) {
-      setMessage(message, error.message, 'error');
+
+    /*
+     * STEP 1: Email + Password login
+     */
+    if (form) {
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            setMessage(message, 'Signing in...');
+
+            const data = Object.fromEntries(new FormData(form));
+
+            try {
+                const result = await API.post('/api/auth/login', data);
+
+                /*
+                 * Case A: TOTP is enabled on this account.
+                 * Password is valid, but TOTP verification is required.
+                 */
+                if (result.totpRequired) {
+                    setMessage(message, '');
+                    if (loginSection) loginSection.style.display = 'none';
+                    if (totpSection) totpSection.style.display = 'block';
+
+                    setMessage(
+                        totpMessage,
+                        'Password verified. Enter your 6-digit authenticator code.',
+                        'success'
+                    );
+
+                    if (totpCode) {
+                        totpCode.value = '';
+                        totpCode.focus();
+                    }
+                    return;
+                }
+
+                /*
+                 * Case B: TOTP is NOT enabled.
+                 * Login is completely successful.
+                 */
+                currentUser = result.user;
+                saveUser(result.user);
+                if (result.user && result.user.userId) {
+                    setTotpStatus(result.user.userId, 'DISABLED');
+                }
+
+                window.location.href = result.user && result.user.role === 'ADMIN'
+                    ? 'admin.html'
+                    : 'index.html';
+
+            } catch (error) {
+                setMessage(message, error.message, 'error');
+            }
+        });
     }
-  });
+
+    /*
+     * STEP 2: TOTP Verification
+     */
+    if (totpForm) {
+        totpForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const code = totpCode ? totpCode.value.trim() : '';
+
+            if (!/^\d{6}$/.test(code)) {
+                setMessage(totpMessage, 'Enter a valid 6-digit numeric code.', 'error');
+                return;
+            }
+
+            if (totpButton) totpButton.disabled = true;
+            setMessage(totpMessage, 'Verifying authenticator code...');
+
+            try {
+                await API.post('/api/totp/login/verify', { code: code });
+
+                // Promoted to authenticated session
+                const user = await loadCurrentUser();
+                if (user && user.userId) {
+                    setTotpStatus(user.userId, 'ENABLED');
+                    saveUser(user);
+                }
+
+                window.location.href = user && user.role === 'ADMIN'
+                    ? 'admin.html'
+                    : 'index.html';
+
+            } catch (error) {
+                setMessage(totpMessage, error.message || 'Invalid TOTP code.', 'error');
+                if (totpButton) totpButton.disabled = false;
+                if (totpCode) totpCode.focus();
+            }
+        });
+    }
+
+    /*
+     * Back to Login button
+     */
+    if (totpBackButton) {
+        totpBackButton.addEventListener('click', () => {
+            setMessage(totpMessage, '');
+            setMessage(message, '');
+            if (totpSection) totpSection.style.display = 'none';
+            if (loginSection) loginSection.style.display = 'block';
+        });
+    }
 }
+
+async function setupSettings() {
+    if (!requireLogin()) return;
+
+    // 1. Load User Profile
+    const user = currentUser || await loadCurrentUser();
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    const nameEl = qs('#user-display-name');
+    const emailEl = qs('#user-display-email');
+    const phoneEl = qs('#user-display-phone');
+    const roleEl = qs('#user-display-role');
+    const statusEl = qs('#user-display-status');
+    const joinedEl = qs('#user-display-joined');
+    const avatarEl = qs('#user-avatar-initial');
+
+    if (nameEl) nameEl.textContent = user.name || 'User';
+    if (emailEl) emailEl.textContent = user.email || '';
+    if (phoneEl) phoneEl.textContent = user.phone || 'Not provided';
+    if (roleEl) roleEl.textContent = user.role || 'CUSTOMER';
+    if (statusEl) statusEl.textContent = user.status || 'ACTIVE';
+    if (joinedEl) joinedEl.textContent = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Recently';
+    if (avatarEl) avatarEl.textContent = (user.name || 'U').charAt(0).toUpperCase();
+
+    // 2. TOTP Interface Elements
+    const badge = qs('#totp-status-badge');
+    const alertMessage = qs('#totp-alert-message');
+
+    const panelDisabled = qs('#panel-totp-disabled');
+    const panelSetup = qs('#panel-totp-setup');
+    const panelEnabled = qs('#panel-totp-enabled');
+    const panelRegen = qs('#panel-totp-regenerated');
+    const panelDisableConfirm = qs('#panel-totp-disable-confirm');
+
+    const btnStartSetup = qs('#btn-start-setup');
+    const btnCancelSetup = qs('#btn-cancel-setup');
+    const formVerifySetup = qs('#form-verify-setup');
+    const setupVerifyCode = qs('#setup-verify-code');
+    const setupSecretCode = qs('#totp-setup-secret');
+    const btnCopySecret = qs('#btn-copy-secret');
+
+    const btnStartRegen = qs('#btn-start-regenerate');
+    const regenSecretCode = qs('#totp-regen-secret');
+    const btnCopyRegenSecret = qs('#btn-copy-regen-secret');
+    const btnDoneRegen = qs('#btn-done-regenerate');
+
+    const btnOpenDisable = qs('#btn-open-disable');
+    const formDisableTotp = qs('#form-disable-totp');
+    const disableTotpCode = qs('#disable-totp-code');
+    const btnCancelDisable = qs('#btn-cancel-disable');
+
+    function hideAllPanels() {
+        [panelDisabled, panelSetup, panelEnabled, panelRegen, panelDisableConfirm].forEach(p => {
+            if (p) p.style.display = 'none';
+        });
+    }
+
+    function setBadgeState(state) {
+        if (!badge) return;
+        if (state === 'ENABLED') {
+            badge.className = 'badge badge-success';
+            badge.textContent = 'Active';
+        } else {
+            badge.className = 'badge badge-muted';
+            badge.textContent = 'Disabled';
+        }
+    }
+
+    function showEnabledView() {
+        hideAllPanels();
+        setBadgeState('ENABLED');
+        setTotpStatus(user.userId, 'ENABLED');
+        if (panelEnabled) panelEnabled.style.display = 'block';
+    }
+
+    function showDisabledView() {
+        hideAllPanels();
+        setBadgeState('DISABLED');
+        setTotpStatus(user.userId, 'DISABLED');
+        if (panelDisabled) panelDisabled.style.display = 'block';
+    }
+
+    // Determine initial state from cached status
+    const cached = getTotpStatus(user.userId);
+    if (cached === 'ENABLED') {
+        showEnabledView();
+    } else {
+        showDisabledView();
+    }
+
+    // Copy-to-clipboard helper
+    function setupCopyButton(btn, textGetter) {
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+            const text = textGetter();
+            if (!text || text === 'LOADING...') return;
+            try {
+                await navigator.clipboard.writeText(text);
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = originalText; }, 1800);
+            } catch (e) {
+                prompt('Copy key manually:', text);
+            }
+        });
+    }
+
+    setupCopyButton(btnCopySecret, () => setupSecretCode ? setupSecretCode.textContent : '');
+    setupCopyButton(btnCopyRegenSecret, () => regenSecretCode ? regenSecretCode.textContent : '');
+
+    /*
+     * FLOW 1: SETUP TOTP
+     */
+    if (btnStartSetup) {
+        btnStartSetup.addEventListener('click', async () => {
+            btnStartSetup.disabled = true;
+            setMessage(alertMessage, 'Generating security keys...');
+
+            try {
+                const response = await API.post('/api/totp/setup');
+                setMessage(alertMessage, '');
+                hideAllPanels();
+                if (panelSetup) panelSetup.style.display = 'block';
+
+                if (setupSecretCode) setupSecretCode.textContent = response.secret;
+                if (window.ScreenlyQR && response.otpauthUri) {
+                    ScreenlyQR.render('#totp-setup-qr', response.otpauthUri, 180);
+                }
+                if (setupVerifyCode) {
+                    setupVerifyCode.value = '';
+                    setupVerifyCode.focus();
+                }
+            } catch (error) {
+                // Self-healing: if backend tells us TOTP is already enabled, update the UI
+                if (error.message && error.message.toLowerCase().includes('already enabled')) {
+                    showEnabledView();
+                    setMessage(alertMessage, 'Two-factor authentication is already active on this account.', 'success');
+                } else {
+                    setMessage(alertMessage, error.message, 'error');
+                }
+            } finally {
+                btnStartSetup.disabled = false;
+            }
+        });
+    }
+
+    if (btnCancelSetup) {
+        btnCancelSetup.addEventListener('click', () => {
+            setMessage(alertMessage, '');
+            showDisabledView();
+        });
+    }
+
+    if (formVerifySetup) {
+        formVerifySetup.addEventListener('submit', async event => {
+            event.preventDefault();
+            const code = setupVerifyCode ? setupVerifyCode.value.trim() : '';
+
+            if (!/^\d{6}$/.test(code)) {
+                setMessage(alertMessage, 'Please enter a valid 6-digit code.', 'error');
+                return;
+            }
+
+            const submitBtn = qs('#btn-submit-setup-verify');
+            if (submitBtn) submitBtn.disabled = true;
+            setMessage(alertMessage, 'Verifying code and activating 2FA...');
+
+            try {
+                const response = await API.post('/api/totp/setup/verify', { code: code });
+                setMessage(alertMessage, (response && response.message) || 'Two-factor authentication enabled successfully!', 'success');
+                showEnabledView();
+            } catch (error) {
+                setMessage(alertMessage, error.message, 'error');
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        });
+    }
+
+    /*
+     * FLOW 2: REGENERATE TOTP
+     */
+    if (btnStartRegen) {
+        btnStartRegen.addEventListener('click', async () => {
+            if (!confirm('Regenerating your 2FA secret will immediately invalidate your previous authenticator configuration. Do you wish to continue?')) {
+                return;
+            }
+
+            btnStartRegen.disabled = true;
+            setMessage(alertMessage, 'Regenerating TOTP secret...');
+
+            try {
+                const response = await API.post('/api/totp/regenerate');
+                setMessage(alertMessage, '');
+                hideAllPanels();
+                if (panelRegen) panelRegen.style.display = 'block';
+
+                if (regenSecretCode) regenSecretCode.textContent = response.secret;
+                if (window.ScreenlyQR && response.otpauthUri) {
+                    ScreenlyQR.render('#totp-regen-qr', response.otpauthUri, 180);
+                }
+            } catch (error) {
+                // Self-healing: if backend says not enabled, reflect that in UI
+                if (error.message && error.message.toLowerCase().includes('not currently enabled')) {
+                    showDisabledView();
+                    setMessage(alertMessage, 'Two-factor authentication is not currently enabled.', 'error');
+                } else {
+                    setMessage(alertMessage, error.message, 'error');
+                }
+            } finally {
+                btnStartRegen.disabled = false;
+            }
+        });
+    }
+
+    if (btnDoneRegen) {
+        btnDoneRegen.addEventListener('click', () => {
+            setMessage(alertMessage, 'New 2FA credentials confirmed.', 'success');
+            showEnabledView();
+        });
+    }
+
+    /*
+     * FLOW 3: DISABLE TOTP
+     */
+    if (btnOpenDisable) {
+        btnOpenDisable.addEventListener('click', () => {
+            setMessage(alertMessage, '');
+            hideAllPanels();
+            if (panelDisableConfirm) panelDisableConfirm.style.display = 'block';
+            if (disableTotpCode) {
+                disableTotpCode.value = '';
+                disableTotpCode.focus();
+            }
+        });
+    }
+
+    if (btnCancelDisable) {
+        btnCancelDisable.addEventListener('click', () => {
+            setMessage(alertMessage, '');
+            showEnabledView();
+        });
+    }
+
+    if (formDisableTotp) {
+        formDisableTotp.addEventListener('submit', async event => {
+            event.preventDefault();
+            const code = disableTotpCode ? disableTotpCode.value.trim() : '';
+
+            if (!/^\d{6}$/.test(code)) {
+                setMessage(alertMessage, 'Please enter a valid 6-digit code.', 'error');
+                return;
+            }
+
+            const confirmBtn = qs('#btn-confirm-disable');
+            if (confirmBtn) confirmBtn.disabled = true;
+            setMessage(alertMessage, 'Disabling two-factor authentication...');
+
+            try {
+                const response = await API.post('/api/totp/disable', { code: code });
+                setMessage(alertMessage, (response && response.message) || 'Two-factor authentication disabled successfully.', 'success');
+                showDisabledView();
+            } catch (error) {
+                setMessage(alertMessage, error.message, 'error');
+            } finally {
+                if (confirmBtn) confirmBtn.disabled = false;
+            }
+        });
+    }
+}
+
+
 
 function setupForgetPassword() {
   let userEmail = '';
@@ -276,6 +676,12 @@ function setupForgetPassword() {
   }
 }
 
+async function createRazorpayOrder(bookingId) {
+  return await API.post(
+    `/api/bookings/${bookingId}/razorpay_order`
+  );
+}
+
 async function setupPayment() {
   if (!requireLogin()) return;
 
@@ -285,54 +691,56 @@ async function setupPayment() {
   const bookingIdElement = qs('#booking-id');
   const amountElement = qs('#booking-amount');
   const countdownElement = qs('#countdown');
-  const form = qs('#payment-form');
-  const pinInput = qs('#payment-pin');
-  const button = qs('#payment-button');
+  const payButton = qs('#pay-razorpay-btn') || qs('#payment-button');
+  const cancelButton = qs('#cancel-payment-btn');
   const message = qs('#payment-message');
 
   if (!bookingId) {
     setMessage(message, 'Booking ID is required.', 'error');
-    if (button) button.disabled = true;
+    if (payButton) payButton.disabled = true;
+    if (cancelButton) cancelButton.disabled = true;
     return;
   }
 
   let timerExpired = false;
+  let activeRazorpayInstance = null;
+  let paymentCompleted = false;
 
-  // Always bind the submit handler so user submission is never blocked
-  if (form) {
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      const pin = pinInput ? pinInput.value.trim() : '';
+  async function handleCancelPayment() {
+    if (paymentCompleted) return;
+    if (payButton) payButton.disabled = true;
+    if (cancelButton) cancelButton.disabled = true;
+    setMessage(message, 'Cancelling booking and redirecting to home page...', 'error');
+    try {
+      await API.remove(`/api/bookings/${bookingId}`);
+    } catch (e) {
+      console.warn('Booking cancellation error:', e);
+    }
+    sessionStorage.removeItem(`booking_hold_${bookingId}`);
+    setTimeout(() => {
+      window.location.href = 'index.html?cancelled=1';
+    }, 1200);
+  }
 
-      if (!pin) {
-        setMessage(message, 'Please enter your payment PIN.', 'error');
-        return;
-      }
+  async function handlePaymentFailure(failureReason) {
+    if (paymentCompleted) return;
+    if (payButton) payButton.disabled = true;
+    if (cancelButton) cancelButton.disabled = true;
+    const desc = failureReason ? `: ${failureReason}` : '';
+    setMessage(message, `Payment failed${desc}. Cancelling booking and returning to home...`, 'error');
+    try {
+      await API.remove(`/api/bookings/${bookingId}`);
+    } catch (e) {
+      console.warn('Booking cancellation error:', e);
+    }
+    sessionStorage.removeItem(`booking_hold_${bookingId}`);
+    setTimeout(() => {
+      window.location.href = 'index.html?failed=1';
+    }, 1500);
+  }
 
-      if (timerExpired) {
-        setMessage(message, 'Payment time has expired. Please select your seats again.', 'error');
-        return;
-      }
-
-      if (button) button.disabled = true;
-      setMessage(message, 'Processing payment...');
-
-      try {
-        await API.post(`/api/bookings/${bookingId}/payment`, { pin: pin });
-        sessionStorage.removeItem(`booking_hold_${bookingId}`);
-
-        setMessage(message, 'Payment successful! Booking confirmed. Opening your ticket...', 'success');
-        if (pinInput) pinInput.disabled = true;
-
-        setTimeout(() => {
-          window.location.href = `bookings.html?booked=${bookingId}`;
-        }, 1000);
-      } catch (error) {
-        if (!timerExpired && button) button.disabled = false;
-        setMessage(message, error.message || 'Payment failed.', 'error');
-        if (pinInput) pinInput.focus();
-      }
-    });
+  if (cancelButton) {
+    cancelButton.addEventListener('click', handleCancelPayment);
   }
 
   try {
@@ -342,19 +750,19 @@ async function setupPayment() {
     if (amountElement) amountElement.textContent = formatMoney(booking.totalAmount);
 
     if (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') {
-      setMessage(message, 'This booking has already been confirmed.', 'success');
-      if (button) button.disabled = true;
-      if (pinInput) pinInput.disabled = true;
+      setMessage(message, 'This booking has already been confirmed. Opening ticket...', 'success');
+      if (payButton) payButton.disabled = true;
+      if (cancelButton) cancelButton.disabled = true;
       setTimeout(() => {
-        window.location.href = `bookings.html?booked=${bookingId}`;
-      }, 1500);
+        window.location.href = `booking.html?bookingId=${bookingId}`;
+      }, 1000);
       return;
     }
 
     if (booking.status === 'CANCELLED') {
       setMessage(message, 'This booking has expired or was cancelled. Please select your seats again.', 'error');
-      if (button) button.disabled = true;
-      if (pinInput) pinInput.disabled = true;
+      if (payButton) payButton.disabled = true;
+      if (cancelButton) cancelButton.disabled = true;
       return;
     }
 
@@ -366,7 +774,6 @@ async function setupPayment() {
     } else if (booking.holdUntil) {
       holdDeadline = new Date(booking.holdUntil).getTime();
     } else {
-      // 2 minutes from current time
       holdDeadline = Date.now() + 2 * 60 * 1000;
     }
     sessionStorage.setItem(`booking_hold_${bookingId}`, String(holdDeadline));
@@ -374,19 +781,104 @@ async function setupPayment() {
     startPaymentCountdown(
       holdDeadline,
       countdownElement,
-      button,
-      pinInput,
+      payButton,
       message,
-      () => { timerExpired = true; }
+      () => {
+        timerExpired = true;
+        if (activeRazorpayInstance && typeof activeRazorpayInstance.close === 'function') {
+          try { activeRazorpayInstance.close(); } catch (ignored) {}
+        }
+      }
     );
+
+    async function launchRazorpay() {
+      if (timerExpired) {
+        setMessage(message, 'Payment time has expired. Please select your seats again.', 'error');
+        return;
+      }
+      setMessage(message, 'Preparing secure Razorpay checkout...');
+      if (payButton) payButton.disabled = true;
+
+      try {
+        const razorpayOrder = await createRazorpayOrder(bookingId);
+        console.log('Razorpay order created:', razorpayOrder);
+
+        const options = {
+          key: razorpayOrder.keyId,
+          amount: Math.round(Number(razorpayOrder.amount) * 100),
+          currency: razorpayOrder.currency,
+          name: 'Screenly Cinemas',
+          description: `Movie booking #${bookingId}`,
+          order_id: razorpayOrder.orderId,
+
+          handler: async function (response) {
+            console.log('Razorpay payment successful:', response);
+            setMessage(message, 'Payment verified! Opening your ticket...', 'success');
+            try {
+              await API.post(
+                `/api/bookings/${bookingId}/razorpay_verify`,
+                {
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpaySignature: response.razorpay_signature
+                }
+              );
+
+              paymentCompleted = true;
+              sessionStorage.removeItem(`booking_hold_${bookingId}`);
+              setMessage(message, 'Payment verified successfully! Opening your ticket...', 'success');
+
+              setTimeout(() => {
+                window.location.href = `booking.html?bookingId=${bookingId}`;
+              }, 1000);
+            } catch (error) {
+              console.error('Razorpay verification failed:', error);
+              handlePaymentFailure(error.message || 'Payment verification failed.');
+            }
+          },
+
+          modal: {
+            ondismiss: function () {
+              if (paymentCompleted) return;
+              console.log('Razorpay Checkout closed/cancelled by user.');
+              handleCancelPayment();
+            }
+          }
+        };
+
+        activeRazorpayInstance = new Razorpay(options);
+
+        activeRazorpayInstance.on('payment.failed', function (resp) {
+          console.error('Razorpay payment failed:', resp.error);
+          const errorDesc = resp.error && resp.error.description ? resp.error.description : 'Transaction failed';
+          handlePaymentFailure(errorDesc);
+        });
+
+        activeRazorpayInstance.open();
+        setMessage(message, 'Complete payment in the Razorpay window.');
+      } catch (error) {
+        console.error('Error starting Razorpay:', error);
+        setMessage(message, error.message || 'Unable to open Razorpay payment gateway.', 'error');
+      } finally {
+        if (!timerExpired && !paymentCompleted && payButton) payButton.disabled = false;
+      }
+    }
+
+    if (payButton) {
+      payButton.addEventListener('click', launchRazorpay);
+    }
+
+    // Automatically open Razorpay checkout
+    launchRazorpay();
 
   } catch (error) {
     setMessage(message, error.message, 'error');
-    if (button) button.disabled = true;
+    if (payButton) payButton.disabled = true;
+    if (cancelButton) cancelButton.disabled = true;
   }
 }
 
-function startPaymentCountdown(deadline, countdownElement, button, pinInput, message, onExpire) {
+function startPaymentCountdown(deadline, countdownElement, button, message, onExpire) {
   const updateCountdown = () => {
     const remaining = deadline - Date.now();
 
@@ -396,7 +888,6 @@ function startPaymentCountdown(deadline, countdownElement, button, pinInput, mes
         countdownElement.classList.add('warning');
       }
       if (button) button.disabled = true;
-      if (pinInput) pinInput.disabled = true;
       setMessage(message, 'Payment time has expired (2 minutes limit). Please return to select seats again.', 'error');
       if (onExpire) onExpire();
       return false;
@@ -536,7 +1027,38 @@ async function loadSeats() {
   function renderSeatMap(seats) {
     const rows = {};
     seats.forEach(seat => { (rows[seat.rowLabel || '?'] ||= []).push(seat); });
-    map.innerHTML = Object.entries(rows).sort(([a], [b]) => a.localeCompare(b)).map(([row, rowSeats]) => `<div class="seat-row"><span class="row-label">${escapeHtml(row)}</span>${rowSeats.sort((a, b) => a.seatNumber - b.seatNumber).map(seat => `<button class="seat ${seat.status === 'BOOKED' ? 'booked' : ''}" data-seat-id="${seat.showSeatId}" data-price="${seat.price}" ${seat.status === 'BOOKED' ? 'disabled' : ''} aria-label="Row ${escapeHtml(row)} seat ${seat.seatNumber}">${seat.seatNumber}</button>`).join('')}</div>`).join(''); map.querySelectorAll('.seat:not(.booked)').forEach(seat => seat.addEventListener('click', () => {
+
+    map.innerHTML = Object.entries(rows)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([row, rowSeats]) => `
+        <div class="seat-row">
+          <span class="row-label">${escapeHtml(row)}</span>
+          ${rowSeats.sort((a, b) => a.seatNumber - b.seatNumber).map(seat => {
+            const status = (seat.status || '').toUpperCase();
+            const isAvailable = status === 'AVAILABLE';
+            const isBooked = status === 'BOOKED';
+            const isHeld = status === 'HELD' || status === 'HOLD';
+
+            let statusClass = 'available';
+            let labelSuffix = '';
+            if (isBooked) {
+              statusClass = 'booked';
+              labelSuffix = ' (Booked)';
+            } else if (isHeld) {
+              statusClass = 'held';
+              labelSuffix = ' (On Hold)';
+            } else if (!isAvailable) {
+              statusClass = 'booked';
+              labelSuffix = ' (Unavailable)';
+            }
+
+            const disabledAttr = !isAvailable ? 'disabled' : '';
+            return `<button class="seat ${statusClass}" data-seat-id="${seat.showSeatId}" data-price="${seat.price}" ${disabledAttr} aria-label="Row ${escapeHtml(row)} seat ${seat.seatNumber}${labelSuffix}">${seat.seatNumber}</button>`;
+          }).join('')}
+        </div>`
+      ).join('');
+
+    map.querySelectorAll('.seat.available:not([disabled])').forEach(seat => seat.addEventListener('click', () => {
       const seatId = Number(seat.dataset.seatId);
       if (selected.has(seatId)) {
         selected.delete(seatId);
@@ -545,7 +1067,8 @@ async function loadSeats() {
       else {
         selected.set(seatId, Number(seat.dataset.price));
         seat.classList.add('selected');
-      } updateSummary();
+      }
+      updateSummary();
     }));
   }
 
@@ -681,7 +1204,10 @@ async function loadBookings() {
         <p>Booked ${booking.bookedAt ? new Date(booking.bookedAt).toLocaleString() : 'recently'}</p></div>
         <div><p class="status ${booking.status === 'CANCELLED' ? 'cancelled' : ''}">${escapeHtml(booking.status)}</p>
         <p><strong>₹${formatMoney(booking.totalAmount)}</strong></p>
-        ${booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' ? `<button class="button button-small danger" data-cancel="${booking.bookingId}">Cancel</button>` : ''}</div></article>`).join('');
+        <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+          <a class="button button-small button-light" href="booking.html?bookingId=${booking.bookingId}">View Ticket</a>
+          ${booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' ? `<button class="button button-small danger" data-cancel="${booking.bookingId}">Cancel</button>` : ''}
+        </div></div></article>`).join('');
 
     list.innerHTML = ticketHtml + cardsHtml;
     list.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => cancelBooking(button.dataset.cancel)));
@@ -704,6 +1230,7 @@ async function loadTicketView() {
   try {
     const full = await fetchFullBookingDetails(bookingId);
     container.innerHTML = renderTicketCard(full.booking, full.show, full.movie, full.screen);
+    setMessage(message, `🎉 Booking #${bookingId} confirmed successfully! Here is your ticket.`, 'success');
   } catch (error) {
     setMessage(message, error.message, 'error');
     if (container) container.innerHTML = '<p class="muted"><a href="bookings.html">Go to My Bookings</a></p>';

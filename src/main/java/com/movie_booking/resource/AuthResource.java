@@ -1,5 +1,7 @@
 package com.movie_booking.resource;
 
+import com.movie_booking.service.TotpService;
+import com.movie_booking.service.TotpServiceImpl;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.sql.SQLException;
@@ -8,6 +10,7 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -20,8 +23,12 @@ import com.movie_booking.dto.request.LoginRequest;
 import com.movie_booking.dto.request.RegisterRequest;
 import com.movie_booking.dto.response.LoginResponse;
 import com.movie_booking.dto.response.RegisterResponse;
+import com.movie_booking.dto.response.UserResponse;
 import com.movie_booking.service.UserService;
 import com.movie_booking.service.UserServiceImpl;
+
+import com.movie_booking.service.TotpService;
+import com.movie_booking.service.TotpServiceImpl;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -30,25 +37,81 @@ import com.movie_booking.service.UserServiceImpl;
 public class AuthResource {
 
     private final UserService userService;
+    private final TotpService totpService;
 
     @Context
     private HttpServletRequest httpRequest;
 
     public AuthResource() {
         this.userService = new UserServiceImpl();
+        this.totpService = new TotpServiceImpl();
+    }
+
+    @GET
+    @Path("/session")
+    public Response getCurrentSession() throws SQLException {
+
+        HttpSession session = httpRequest.getSession(false);
+
+        if (session == null) {
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(Map.of(
+                            "message", "User is not logged in."
+                    ))
+                    .build();
+        }
+
+        Object userIdObject = session.getAttribute("userId");
+
+        if (userIdObject == null) {
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(Map.of(
+                            "message", "User is not logged in."
+                    ))
+                    .build();
+        }
+
+        int userId = (Integer) userIdObject;
+
+        UserResponse user = userService.getUserById(userId);
+
+        if (user == null) {
+            session.invalidate();
+
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(Map.of(
+                            "message", "User session is invalid."
+                    ))
+                    .build();
+        }
+
+        return Response.ok(user).build();
     }
 
     @POST
     @Path("/login")
-    public LoginResponse login(LoginRequest request) throws java.sql.SQLException {
+    public LoginResponse login(LoginRequest request) throws SQLException {
+
         LoginResponse response = userService.login(request);
+        int userId = response.getUser().getUserId();
+        boolean totpEnabled = totpService.isTotpEnabled(userId);
+
         HttpSession oldSession = httpRequest.getSession(false);
         if (oldSession != null) {
             oldSession.invalidate();
         }
 
-        HttpSession newSession = httpRequest.getSession(true);
-        newSession.setAttribute("userId", response.getUser().getUserId());
+        HttpSession session = httpRequest.getSession(true);
+
+        if (totpEnabled) {
+            session.setAttribute("pendingTotpUserId", userId);
+            response.setTotpRequired(true);
+            response.setMessage("TOTP verification required.");
+            return response;
+        }
+
+        session.setAttribute("userId", userId);
+        response.setTotpRequired(false);
 
         return response;
     }

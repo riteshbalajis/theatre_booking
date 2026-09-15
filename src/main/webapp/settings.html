@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Screenly | Account Settings</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body data-page="settings">
+
+    <!-- Common Navigation Header -->
+    <div id="site-header"></div>
+
+    <main class="page-shell">
+
+        <!-- Page Heading -->
+        <section class="page-heading">
+            <p class="eyebrow">Your Account</p>
+            <h1>Account & Security Settings</h1>
+            <p class="muted">Manage your profile and secure your Screenly account with two-factor authentication (TOTP).</p>
+        </section>
+
+        <!-- Notification Message -->
+        <div id="settings-global-message" class="message" role="status"></div>
+
+        <div class="settings-grid">
+
+            <!-- ================================================= -->
+            <!-- CARD 1: PROFILE SUMMARY                           -->
+            <!-- ================================================= -->
+            <section class="settings-card profile-card">
+                <div class="card-header">
+                    <h2>Profile Details</h2>
+                </div>
+
+                <div class="profile-details-list">
+                    <div class="profile-avatar">
+                        <span id="user-avatar-initial">U</span>
+                    </div>
+
+                    <div class="profile-field">
+                        <span class="field-label">Full Name</span>
+                        <strong id="user-display-name" class="field-value">Loading...</strong>
+                    </div>
+
+                    <div class="profile-field">
+                        <span class="field-label">Email Address</span>
+                        <span id="user-display-email" class="field-value">Loading...</span>
+                    </div>
+
+                    <div class="profile-field">
+                        <span class="field-label">Phone Number</span>
+                        <span id="user-display-phone" class="field-value">Not provided</span>
+                    </div>
+
+                    <div class="profile-field">
+                        <span class="field-label">Account Role</span>
+                        <span id="user-display-role" class="badge badge-teal">CUSTOMER</span>
+                    </div>
+
+                    <div class="profile-field">
+                        <span class="field-label">Account Status</span>
+                        <span id="user-display-status" class="badge badge-success">ACTIVE</span>
+                    </div>
+
+                    <div class="profile-field">
+                        <span class="field-label">Member Since</span>
+                        <span id="user-display-joined" class="field-value">Recently</span>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ================================================= -->
+            <!-- CARD 2: TWO-FACTOR AUTHENTICATION (TOTP)          -->
+            <!-- ================================================= -->
+            <section class="settings-card security-card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h2>Two-Factor Authentication (TOTP)</h2>
+                        <p class="muted" style="margin-top: 4px; font-size: 0.92rem;">
+                            Protect your account by requiring an authenticator code (e.g. Google Authenticator) when logging in.
+                        </p>
+                    </div>
+                    <span id="totp-status-badge" class="badge badge-muted">Checking...</span>
+                </div>
+
+                <!-- Alert Message inside Security Card -->
+                <div id="totp-alert-message" class="message" role="alert"></div>
+
+                <!-- ----------------------------------------------- -->
+                <!-- STATE 1: TOTP IS DISABLED (Setup Entrypoint)    -->
+                <!-- ----------------------------------------------- -->
+                <div id="panel-totp-disabled" class="totp-panel" style="display: none;">
+                    <div class="info-callout">
+                        <strong>🛡️ Enhance your account security:</strong>
+                        Two-factor authentication adds an extra verification step during sign in to prevent unauthorized access even if your password is compromised.
+                    </div>
+
+                    <div style="margin-top: 24px;">
+                        <button id="btn-start-setup" class="button" type="button">
+                            Setup Two-Factor Authentication
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ----------------------------------------------- -->
+                <!-- STATE 2: SETUP IN PROGRESS (QR + Code Verify)   -->
+                <!-- ----------------------------------------------- -->
+                <div id="panel-totp-setup" class="totp-panel" style="display: none;">
+                    <div class="setup-stepper">
+                        <div class="setup-step">
+                            <span class="step-badge">Step 1</span>
+                            <h3>Scan QR Code with Authenticator App</h3>
+                            <p class="muted">
+                                Open Google Authenticator, Microsoft Authenticator, Authy, or 1Password on your mobile device and scan the QR code below.
+                            </p>
+
+                            <!-- QR Code Frame -->
+                            <div class="qr-presentation">
+                                <div id="totp-setup-qr" class="qr-canvas-container"></div>
+                            </div>
+
+                            <!-- Manual Key Entry -->
+                            <div class="manual-key-box">
+                                <span class="manual-key-label">Can't scan the QR code? Enter this secret manually:</span>
+                                <div class="secret-key-row">
+                                    <code id="totp-setup-secret" class="secret-key-code">LOADING...</code>
+                                    <button id="btn-copy-secret" class="button button-small button-light" type="button" title="Copy to clipboard">
+                                        Copy Key
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="setup-step" style="margin-top: 28px;">
+                            <span class="step-badge">Step 2</span>
+                            <h3>Enter Verification Code</h3>
+                            <p class="muted">
+                                Enter the 6-digit code shown in your authenticator app to confirm setup.
+                            </p>
+
+                            <form id="form-verify-setup" class="stack-form" style="max-width: 320px;">
+                                <label>
+                                    6-Digit Authenticator Code
+                                    <input
+                                        id="setup-verify-code"
+                                        type="text"
+                                        inputmode="numeric"
+                                        pattern="[0-9]{6}"
+                                        maxlength="6"
+                                        placeholder="000 000"
+                                        class="totp-code-input"
+                                        autocomplete="one-time-code"
+                                        required>
+                                </label>
+
+                                <div class="form-actions-row">
+                                    <button id="btn-submit-setup-verify" class="button" type="submit">
+                                        Activate 2FA
+                                    </button>
+                                    <button id="btn-cancel-setup" class="button button-light" type="button">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ----------------------------------------------- -->
+                <!-- STATE 3: TOTP IS ENABLED (Management Actions)   -->
+                <!-- ----------------------------------------------- -->
+                <div id="panel-totp-enabled" class="totp-panel" style="display: none;">
+                    <div class="success-callout">
+                        <strong>✅ Two-factor authentication is active.</strong>
+                        Your account requires a 6-digit authenticator code each time you sign in.
+                    </div>
+
+                    <div class="totp-actions-grid">
+                        <!-- Action A: Regenerate -->
+                        <div class="action-card">
+                            <h3>Regenerate 2FA Secret / QR Code</h3>
+                            <p class="muted">
+                                If you changed devices or need to re-pair your authenticator app, generate a new secret key. Your previous setup will be invalidated.
+                            </p>
+                            <button id="btn-start-regenerate" class="button button-light" type="button">
+                                Regenerate 2FA Secret
+                            </button>
+                        </div>
+
+                        <!-- Action B: Disable -->
+                        <div class="action-card">
+                            <h3>Disable Two-Factor Authentication</h3>
+                            <p class="muted">
+                                Turn off two-factor authentication. You will only need your email and password to log in.
+                            </p>
+                            <button id="btn-open-disable" class="button danger" type="button">
+                                Disable 2FA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ----------------------------------------------- -->
+                <!-- SUB-VIEW: REGENERATION RESULT (New QR + Key)    -->
+                <!-- ----------------------------------------------- -->
+                <div id="panel-totp-regenerated" class="totp-panel" style="display: none;">
+                    <div class="warning-callout">
+                        <strong>⚠️ New Secret Generated:</strong>
+                        Your previous authenticator setup has been replaced. You must scan the new QR code below or enter the new secret key into your authenticator app now.
+                    </div>
+
+                    <div class="qr-presentation">
+                        <div id="totp-regen-qr" class="qr-canvas-container"></div>
+                    </div>
+
+                    <div class="manual-key-box">
+                        <span class="manual-key-label">New Secret Key:</span>
+                        <div class="secret-key-row">
+                            <code id="totp-regen-secret" class="secret-key-code">LOADING...</code>
+                            <button id="btn-copy-regen-secret" class="button button-small button-light" type="button" title="Copy to clipboard">
+                                Copy Key
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 24px;">
+                        <button id="btn-done-regenerate" class="button" type="button">
+                            I Have Scanned the New Code
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ----------------------------------------------- -->
+                <!-- SUB-VIEW / MODAL: CONFIRM DISABLE TOTP          -->
+                <!-- ----------------------------------------------- -->
+                <div id="panel-totp-disable-confirm" class="totp-panel" style="display: none;">
+                    <div class="warning-callout">
+                        <strong>⚠️ Confirm Disabling 2FA:</strong>
+                        Disabling two-factor authentication reduces your account security. Please verify your identity by entering your current authenticator code.
+                    </div>
+
+                    <form id="form-disable-totp" class="stack-form" style="max-width: 340px; margin-top: 18px;">
+                        <label>
+                            Current 6-Digit Authenticator Code
+                            <input
+                                id="disable-totp-code"
+                                type="text"
+                                inputmode="numeric"
+                                pattern="[0-9]{6}"
+                                maxlength="6"
+                                placeholder="000 000"
+                                class="totp-code-input"
+                                autocomplete="one-time-code"
+                                required>
+                        </label>
+
+                        <div class="form-actions-row">
+                            <button id="btn-confirm-disable" class="button danger" type="submit">
+                                Confirm & Disable 2FA
+                            </button>
+                            <button id="btn-cancel-disable" class="button button-light" type="button">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- Scripts -->
+    <script src="js/qrcode.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+
+</html>

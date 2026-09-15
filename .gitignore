@@ -20,3 +20,10 @@ classes/
 Thumbs.db
 
 .env
+
+# Local utility files and encrypted secrets
+**/util/
+*.enc
+
+# Maven build output
+target/

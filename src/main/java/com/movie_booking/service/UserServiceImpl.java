@@ -94,6 +94,12 @@ public class UserServiceImpl implements UserService {
             user.setStatus(UserStatus.ACTIVE);
         }
         int userId = userDao.createUser(user);
+
+        emailService.sendWelcomeEmail(
+                user.getEmail(),
+                user.getName()
+        );
+
         return new RegisterResponse(userId, "User registered successfully.");
 
     }
@@ -112,6 +118,8 @@ public class UserServiceImpl implements UserService {
         }
         return new LoginResponse(toUserResponse(user), "Login successful.");
     }
+
+    
 
     @Override
     public boolean forgotPassword(String email) throws SQLException {
@@ -312,20 +320,17 @@ public class UserServiceImpl implements UserService {
         String email = payload.getEmail();
         String name = (String) payload.get("name");
 
-        System.out.println(">>> Google subject: " + googleSub);
-        System.out.println(">>> Google email: " + email);
-        System.out.println(">>> Google name: " + name);
-
+        //System.out.println(">>> Google subject: " + googleSub);
+        //System.out.println(">>> Google email: " + email);
+        //System.out.println(">>> Google name: " + name);
         User user = userDao.findByGoogleSub(googleSub);
 
-        System.out.println(">>> findByGoogleSub completed");
-
+        //System.out.println(">>> findByGoogleSub completed");
         if (user == null) {
 
             user = userDao.findByEmail(email);
 
-            System.out.println(">>> findByEmail completed");
-
+            // System.out.println(">>> findByEmail completed");
             if (user != null) {
 
                 userDao.updateGoogleSub(user.getUserId(), googleSub);
@@ -342,15 +347,17 @@ public class UserServiceImpl implements UserService {
                 newUser.setRole(UserRole.CUSTOMER);
                 newUser.setStatus(UserStatus.ACTIVE);
 
-                System.out.println(">>> Creating new Google user");
-
+                //System.out.println(">>> Creating new Google user");
                 int userId = userDao.createUser(newUser);
 
-                System.out.println(">>> New user created: " + userId);
-
+                //System.out.println(">>> New user created: " + userId);
                 user = userDao.findById(userId);
+                emailService.sendWelcomeEmail(
+                        user.getEmail(),
+                        user.getName()
+                );
 
-                System.out.println(">>> New user loaded");
+                //System.out.println(">>> New user loaded");
             }
         }
 

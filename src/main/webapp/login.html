@@ -1,85 +1,214 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Screenly | Login</title><link rel="stylesheet" href="css/styles.css">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Screenly | Login</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+
+    <!-- Google Sign-In -->
+    <script
+        src="https://accounts.google.com/gsi/client"
+        async
+        defer>
+    </script>
 </head>
+
 <body data-page="login">
-  <div id="site-header"></div>
-  
-<main class="auth-shell">
-    <section class="form-panel">
 
-        <p class="eyebrow">Welcome back</p>
+    <!-- Common Header -->
+    <div id="site-header"></div>
 
-        <h1>Log in to Screenly</h1>
+    <main class="auth-shell">
 
-        <p class="muted">
-            Use your account to book seats and manage your bookings.
-        </p>
+        <section class="form-panel">
 
-        <!-- Normal email/password login -->
-        <form id="login-form" class="stack-form">
+            <!-- ================================================= -->
+            <!-- STEP 1: NORMAL EMAIL/PASSWORD LOGIN               -->
+            <!-- ================================================= -->
+            <div id="login-section">
 
-            <label>
-                Email
-                <input name="email"
-                       type="email"
-                       autocomplete="email"
-                       required>
-            </label>
+                <p class="eyebrow">
+                    Welcome back
+                </p>
 
-            <label>
-                Password
-                <input name="password"
-                       type="password"
-                       autocomplete="current-password"
-                       required>
-            </label>
+                <h1>
+                    Log in to Screenly
+                </h1>
 
-            <p class="form-footer">
-                <a href="forget_password.html" id="forgot-password-link">Forgot your password?</a>
-            </p>
+                <p class="muted">
+                    Use your account to book seats and manage your bookings.
+                </p>
 
-            <div id="form-message"
-                 class="message"
-                 role="alert">
+                <form id="login-form" class="stack-form">
+
+                    <label>
+                        Email
+                        <input
+                            id="login-email"
+                            name="email"
+                            type="email"
+                            autocomplete="email"
+                            placeholder="name@example.com"
+                            required>
+                    </label>
+
+                    <label>
+                        Password
+                        <input
+                            id="login-password"
+                            name="password"
+                            type="password"
+                            autocomplete="current-password"
+                            placeholder="Enter your password"
+                            required>
+                    </label>
+
+                    <!-- Forgot Password Link -->
+                    <p class="form-footer" style="margin-top: 4px; text-align: right;">
+                        <a
+                            href="forget_password.html"
+                            id="forgot-password-link">
+                            Forgot your password?
+                        </a>
+                    </p>
+
+                    <!-- Login message -->
+                    <div
+                        id="form-message"
+                        class="message"
+                        role="alert">
+                    </div>
+
+                    <!-- Login button -->
+                    <button
+                        id="login-submit-button"
+                        class="button"
+                        type="submit">
+                        Log in
+                    </button>
+
+                </form>
+
+                <!-- Separator & Alternative Sign-ins -->
+                <div id="oauth-section">
+                    <p
+                        class="muted"
+                        style="text-align:center; margin:24px 0 16px;">
+                        OR
+                    </p>
+
+                    <!-- Google Sign-in -->
+                    <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                        <div
+                            id="g_id_onload"
+                            data-client_id="272663743548-itpthoqm2u1uik1kfe77aa13ts49omva.apps.googleusercontent.com"
+                            data-callback="handleGoogleLogin">
+                        </div>
+
+                        <div
+                            class="g_id_signin"
+                            data-type="standard"
+                            data-size="large"
+                            data-theme="outline"
+                            data-text="signin_with"
+                            data-shape="rectangular">
+                        </div>
+                    </div>
+
+                    <!-- Register Link -->
+                    <p class="form-footer">
+                        New here?
+                        <a href="register.html">
+                            Create an account
+                        </a>
+                    </p>
+                </div>
+
             </div>
 
-            <button class="button" type="submit">
-                Log in
-            </button>
 
-        </form>
+            <!-- ================================================= -->
+            <!-- STEP 2: TOTP TWO-FACTOR VERIFICATION             -->
+            <!-- Shown when backend returns totpRequired: true    -->
+            <!-- ================================================= -->
+            <div
+                id="totp-section"
+                style="display: none;">
 
-        <!-- Separator -->
-        <p class="muted" style="text-align:center; margin:20px 0;">
-            OR
-        </p>
+                <div class="totp-header-icon">
+                    <div class="security-shield-icon">🛡️</div>
+                </div>
 
-        <!-- Google Sign-In -->
-        <div id="g_id_onload"
-             data-client_id="272663743548-itpthoqm2u1uik1kfe77aa13ts49omva.apps.googleusercontent.com"
-             data-callback="handleGoogleLogin">
-        </div>
+                <p class="eyebrow" style="text-align: center;">
+                    Two-Factor Authentication
+                </p>
 
-        <div class="g_id_signin"
-             data-type="standard"
-             data-size="large"
-             data-theme="outline"
-             data-text="signin_with"
-             data-shape="rectangular">
-        </div>
+                <h2 style="text-align: center; margin-bottom: 8px;">
+                    Enter verification code
+                </h2>
 
-        <p class="form-footer">
-            New here?
-            <a href="register.html">Create an account</a>
-        </p>
+                <p class="muted" style="text-align: center; margin-bottom: 24px;">
+                    Enter the 6-digit security code generated by your authenticator app.
+                </p>
 
-    </section>
-</main>
+                <form
+                    id="totp-form"
+                    class="stack-form">
 
+                    <label style="text-align: center;">
+                        <span style="display: block; margin-bottom: 6px;">Authenticator Code</span>
+                        <input
+                            id="totp-code"
+                            type="text"
+                            inputmode="numeric"
+                            pattern="[0-9]{6}"
+                            maxlength="6"
+                            autocomplete="one-time-code"
+                            placeholder="000 000"
+                            class="totp-code-input"
+                            required>
+                    </label>
 
-  <script src="js/api.js"></script><script src="js/common.js"></script><script src="js/app.js"></script>
-</body></html>
+                    <!-- TOTP message -->
+                    <div
+                        id="totp-message"
+                        class="message"
+                        role="alert">
+                    </div>
+
+                    <!-- Verify TOTP button -->
+                    <button
+                        id="totp-verify-button"
+                        class="button"
+                        type="submit">
+                        Verify & Sign In
+                    </button>
+
+                    <!-- Back to login button -->
+                    <button
+                        id="totp-back-button"
+                        class="button button-light button-block"
+                        type="button">
+                        &larr; Back to login
+                    </button>
+
+                </form>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/app.js"></script>
+
+</body>
+
+</html>

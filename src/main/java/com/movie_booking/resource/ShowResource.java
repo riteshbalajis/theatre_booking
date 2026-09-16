@@ -24,6 +24,7 @@ import com.movie_booking.dto.response.CreateResponse;
 import com.movie_booking.dto.response.ShowResponse;
 import com.movie_booking.exception.ResourceNotFoundException;
 import com.movie_booking.exception.UnauthorizedException;
+import com.movie_booking.exception.ValidationException;
 import com.movie_booking.model.Show;
 import com.movie_booking.service.ShowService;
 import com.movie_booking.service.ShowServiceImpl;
@@ -77,7 +78,7 @@ public class ShowResource {
         try {
             localDate = LocalDate.parse(date);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid date format. Expected format: YYYY-MM-DD");
+            throw new ValidationException("Invalid date format. Expected format: YYYY-MM-DD");
         }
         List<Show> shows = showService.getShowsByMovieAndDate(movieId, localDate);
         return shows.stream()
@@ -92,7 +93,7 @@ public class ShowResource {
         try {
             localDate = LocalDate.parse(date);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid date format. Expected format: YYYY-MM-DD");
+            throw new ValidationException("Invalid date format. Expected format: YYYY-MM-DD");
         }
         List<Show> shows = showService.getShowsByDate(localDate);
         return shows.stream()

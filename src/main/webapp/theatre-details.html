@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screenly | Theatre Details</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="theatre_details">
+  <div id="site-header"></div>
+  <main class="page-shell">
+    <div id="theatre-detail" class="detail-layout"></div>
+    <section class="theatre-screens-section">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Venue Facilities</p>
+          <h2>Screens in this Theatre</h2>
+        </div>
+        <a class="button button-light button-small" href="theatres.html">&larr; Back to Theatres</a>
+      </div>
+      <div id="theatre-screens-list" class="screens-grid" aria-live="polite"></div>
+      <div id="page-message" class="message" role="status"></div>
+    </section>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

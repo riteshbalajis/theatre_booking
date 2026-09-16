@@ -19,6 +19,8 @@ D:\movie_booking\src\main\java\com\movie_booking\dao\ShowSeatDao.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\ShowSeatDaoImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\TheatreDao.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\TheatreDaoImpl.java
+D:\movie_booking\src\main\java\com\movie_booking\dao\TotpRecoveryTokenDao.java
+D:\movie_booking\src\main\java\com\movie_booking\dao\TotpRecoveryTokenDaoImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\UserDao.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\UserDaoImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\BookTicketsRequest.java
@@ -38,6 +40,7 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\request\ShowCreateRequest.j
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\ShowUpdateRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\TheatreCreateRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\TheatreUpdateRequest.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\request\TotpRecoveryVerifyRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\TotpVerifyRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\UserUpdateRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\BookingCreatedResponse.java
@@ -57,6 +60,7 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowSeatCountRespo
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowSeatResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreCreateResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreResponse.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpRecoveryResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpSetupResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\UserResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\exception\InvalidCredentialsException.java
@@ -69,6 +73,8 @@ D:\movie_booking\src\main\java\com\movie_booking\exception\SQLExceptionMapper.ja
 D:\movie_booking\src\main\java\com\movie_booking\exception\TheatreNotFoundException.java
 D:\movie_booking\src\main\java\com\movie_booking\exception\UnauthorizedException.java
 D:\movie_booking\src\main\java\com\movie_booking\exception\UnauthorizedExceptionMapper.java
+D:\movie_booking\src\main\java\com\movie_booking\exception\ValidationException.java
+D:\movie_booking\src\main\java\com\movie_booking\exception\ValidationExceptionMapper.java
 D:\movie_booking\src\main\java\com\movie_booking\model\Booking.java
 D:\movie_booking\src\main\java\com\movie_booking\model\BookingSeat.java
 D:\movie_booking\src\main\java\com\movie_booking\model\BookingStatus.java
@@ -86,6 +92,8 @@ D:\movie_booking\src\main\java\com\movie_booking\model\ShowSeatStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\ShowStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\Theatre.java
 D:\movie_booking\src\main\java\com\movie_booking\model\TheatreStatus.java
+D:\movie_booking\src\main\java\com\movie_booking\model\TotpRecoveryMethod.java
+D:\movie_booking\src\main\java\com\movie_booking\model\TotpRecoveryToken.java
 D:\movie_booking\src\main\java\com\movie_booking\model\User.java
 D:\movie_booking\src\main\java\com\movie_booking\model\UserRole.java
 D:\movie_booking\src\main\java\com\movie_booking\model\UserStatus.java
@@ -98,6 +106,7 @@ D:\movie_booking\src\main\java\com\movie_booking\resource\SeatResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\ShowResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\ShowSeatResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\TheatreResource.java
+D:\movie_booking\src\main\java\com\movie_booking\resource\TotpRecoveryResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\TotpResource.java
 D:\movie_booking\src\main\java\com\movie_booking\service\AuthenticationRequiredException.java
 D:\movie_booking\src\main\java\com\movie_booking\service\AuthorizationException.java
@@ -117,6 +126,8 @@ D:\movie_booking\src\main\java\com\movie_booking\service\ShowService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\ShowServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TheatreService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TheatreServiceImpl.java
+D:\movie_booking\src\main\java\com\movie_booking\service\TotpRecoveryService.java
+D:\movie_booking\src\main\java\com\movie_booking\service\TotpRecoveryServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TotpService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TotpServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\UserService.java

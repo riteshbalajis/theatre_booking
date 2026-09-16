@@ -7,8 +7,21 @@ function escapeHtml(value) {
 
 function qs(selector, root = document) { return root.querySelector(selector); }
 function formatMoney(value) { return Number(value || 0).toFixed(2); }
+function parseDateTime(value) {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0] = value;
+    return new Date(year, month - 1, day, hour, minute, second);
+  }
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
 function formatDate(value) {
   if (!value) return 'Date unavailable';
+  if (Array.isArray(value)) {
+    const d = parseDateTime(value);
+    return d ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d) : 'Date unavailable';
+  }
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`));
 }
 function formatTime(value) { return value ? value.slice(0, 5) : 'Time unavailable'; }
@@ -37,6 +50,7 @@ function renderHeader() {
   target.className = 'site-header';
   target.innerHTML = `<header class="navbar"><a class="brand" href="index.html">SCREENLY</a>
   <nav class="nav-links"><a href="movies.html">Movies</a>
+  <a href="theatres.html">Theatres</a>
   ${user ? '<a href="bookings.html">My bookings</a><a href="settings.html">Settings</a>' : ''}
   ${user && user.role === 'ADMIN' ? '<a href="admin.html">Admin</a>' : ''}
   ${user ? `<span class="nav-user">${escapeHtml(user.name)}</span>
@@ -66,6 +80,20 @@ async function loadCurrentUser() {
 function requireLogin() {
     if (!currentUser) {
         window.location.href = 'login.html';
+        return false;
+    }
+
+    return true;
+}
+
+function requireAdmin() {
+    if (!currentUser) {
+        window.location.href = 'login.html';
+        return false;
+    }
+
+    if (currentUser.role !== 'ADMIN') {
+        window.location.href = 'index.html';
         return false;
     }
 

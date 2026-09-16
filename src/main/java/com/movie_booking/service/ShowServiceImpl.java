@@ -1,22 +1,24 @@
 package com.movie_booking.service;
 
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.List;
+
 import com.movie_booking.dao.ShowDao;
 import com.movie_booking.dao.ShowDaoImpl;
 import com.movie_booking.dao.ShowSeatDao;
 import com.movie_booking.dao.ShowSeatDaoImpl;
 import com.movie_booking.dao.UserDao;
 import com.movie_booking.dao.UserDaoImpl;
+import com.movie_booking.exception.ValidationException;
 import com.movie_booking.model.Show;
 import com.movie_booking.model.ShowStatus;
 import com.movie_booking.model.User;
 import com.movie_booking.model.UserRole;
 import com.movie_booking.model.UserStatus;
 import com.movie_booking.util.DBConnection;
-import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.time.LocalDate;
-import java.util.List;
 
 public class ShowServiceImpl implements ShowService {
     private final ShowDao showDao;
@@ -151,7 +153,7 @@ public class ShowServiceImpl implements ShowService {
         requireAdmin(authenticatedUserId);
         requirePositiveId(showId, "Show ID");
         if (status == null) {
-            throw new IllegalArgumentException("Status cannot be null.");
+            throw new ValidationException("Status cannot be null.");
         }
         return showDao.updateShowStatus(showId, status);
     }
@@ -183,7 +185,7 @@ public class ShowServiceImpl implements ShowService {
             if (existing.getShowId() != excludedShowId
                     && existing.getStatus() != ShowStatus.CANCELLED
                     && overlaps(candidate, existing)) {
-                throw new IllegalArgumentException("Show time overlaps another show on this screen.");
+                throw new ValidationException("Show time overlaps another show on this screen.");
             }
         }
     }
@@ -195,22 +197,22 @@ public class ShowServiceImpl implements ShowService {
 
     private static void validateShow(Show show) {
         if (show == null) {
-            throw new IllegalArgumentException("Show cannot be null.");
+            throw new ValidationException("Show cannot be null.");
         }
         requirePositiveId(show.getMovieId(), "Movie ID");
         requirePositiveId(show.getScreenId(), "Screen ID");
         requireDate(show.getShowDate());
         if (show.getStartTime() == null || show.getEndTime() == null) {
-            throw new IllegalArgumentException("Start time and end time are required.");
+            throw new ValidationException("Start time and end time are required.");
         }
         if (!show.getEndTime().isAfter(show.getStartTime())) {
-            throw new IllegalArgumentException("End time must be after start time.");
+            throw new ValidationException("End time must be after start time.");
         }
     }
 
     private static void validateShowForUpdate(Show show) {
         if (show == null || show.getShowId() <= 0) {
-            throw new IllegalArgumentException("A valid show is required.");
+            throw new ValidationException("A valid show is required.");
         }
         validateShow(show);
     }
@@ -223,25 +225,25 @@ public class ShowServiceImpl implements ShowService {
 
     private static void validatePrice(BigDecimal price, String fieldName) {
         if (price == null || price.signum() < 0) {
-            throw new IllegalArgumentException(fieldName + " cannot be null or negative.");
+            throw new ValidationException(fieldName + " cannot be null or negative.");
         }
     }
 
     private static void validateNotPast(Show show) {
         if (show.getShowDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("Show date cannot be in the past.");
+            throw new ValidationException("Show date cannot be in the past.");
         }
     }
 
     private static void requireDate(LocalDate date) {
         if (date == null) {
-            throw new IllegalArgumentException("Show date cannot be null.");
+            throw new ValidationException("Show date cannot be null.");
         }
     }
 
     private static void requirePositiveId(int id, String fieldName) {
         if (id <= 0) {
-            throw new IllegalArgumentException(fieldName + " must be positive.");
+            throw new ValidationException(fieldName + " must be positive.");
         }
     }
 

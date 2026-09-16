@@ -42,12 +42,15 @@ com\movie_booking\service\EmailService.class
 com\movie_booking\dto\response\BookingSeatResponse.class
 com\movie_booking\dto\response\BookingResponse.class
 com\movie_booking\dto\response\ErrorResponse.class
+com\movie_booking\resource\TotpRecoveryResource.class
 com\movie_booking\service\TheatreService.class
 com\movie_booking\dto\request\TotpVerifyRequest.class
 com\movie_booking\dto\response\MovieResponse.class
 com\movie_booking\model\SeatType.class
 com\movie_booking\dao\TheatreDaoImpl.class
 com\movie_booking\exception\ScreenNotFoundException.class
+com\movie_booking\service\TotpRecoveryServiceImpl.class
+com\movie_booking\service\TotpRecoveryService.class
 com\movie_booking\dto\request\ScreenUpdateRequest.class
 com\movie_booking\model\Theatre.class
 com\movie_booking\util\DBConnection.class
@@ -65,6 +68,8 @@ com\movie_booking\dao\MovieDaoImpl.class
 com\movie_booking\dto\request\BookTicketsRequest.class
 com\movie_booking\dao\SeatDaoImpl.class
 com\movie_booking\resource\SeatResource.class
+com\movie_booking\dto\response\TotpRecoveryResponse.class
+com\movie_booking\dto\request\TotpRecoveryVerifyRequest.class
 com\movie_booking\service\SeatService.class
 com\movie_booking\dto\response\RegisterResponse.class
 com\movie_booking\dto\response\SeatResponse.class
@@ -79,6 +84,7 @@ com\movie_booking\dao\PasswordResetTokenDaoImpl.class
 com\movie_booking\dao\ScreenDao.class
 com\movie_booking\exception\UnauthorizedExceptionMapper.class
 com\movie_booking\dto\request\TheatreUpdateRequest.class
+com\movie_booking\dao\TotpRecoveryTokenDao.class
 com\movie_booking\model\ScreenStatus.class
 com\movie_booking\util\RazorpayConfig.class
 com\movie_booking\service\AuthenticationRequiredException.class
@@ -94,6 +100,7 @@ com\movie_booking\service\ShowSeatServiceImpl.class
 com\movie_booking\model\BookingSeat.class
 com\movie_booking\model\UserRole.class
 com\movie_booking\model\Screen.class
+com\movie_booking\model\TotpRecoveryMethod.class
 ResourceNotFoundExceptionMapper.class
 com\movie_booking\resource\EmailTestResource.class
 com\movie_booking\service\BookingServiceImpl.class
@@ -103,11 +110,13 @@ com\movie_booking\dao\UserDao.class
 com\movie_booking\exception\UnauthorizedException.class
 com\movie_booking\dao\ShowDaoImpl.class
 com\movie_booking\service\AuthorizationException.class
+com\movie_booking\exception\ValidationException.class
 com\movie_booking\service\MovieServiceImpl.class
 com\movie_booking\dto\response\ShowSeatCountResponse.class
 com\movie_booking\dao\ShowSeatDaoImpl.class
 com\movie_booking\service\ShowService.class
 com\movie_booking\dto\request\UserUpdateRequest.class
+com\movie_booking\exception\ValidationExceptionMapper.class
 com\movie_booking\dao\ScreenDaoImpl.class
 com\movie_booking\dto\response\ShowSeatResponse.class
 com\movie_booking\dto\response\TotpSetupResponse.class
@@ -119,6 +128,8 @@ com\movie_booking\dto\request\ScreenCreateRequest.class
 com\movie_booking\resource\ScreenResource.class
 com\movie_booking\dao\ShowSeatDao.class
 com\movie_booking\model\Show.class
+com\movie_booking\dao\TotpRecoveryTokenDaoImpl.class
+com\movie_booking\model\TotpRecoveryToken.class
 com\movie_booking\exception\TheatreNotFoundException.class
 com\movie_booking\model\BookingStatus.class
 com\movie_booking\dao\BookingSeatDaoImpl.class

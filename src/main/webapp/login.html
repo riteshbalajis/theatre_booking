@@ -188,6 +188,12 @@
                         Verify & Sign In
                     </button>
 
+                    <div id="totp-recovery-actions" style="margin-top: 8px; text-align: center;">
+                        <button id="totp-recovery-email-button" class="button button-light button-block" type="button">
+                            Recover through email
+                        </button>
+                    </div>
+
                     <!-- Back to login button -->
                     <button
                         id="totp-back-button"
@@ -198,6 +204,54 @@
 
                 </form>
 
+                <div id="totp-email-recovery" style="display: none; margin-top: 24px;">
+                    <h3 style="text-align: center;">Recover authenticator access</h3>
+                    <p class="muted" style="text-align: center;">
+                        We will send a one-time recovery code to your account email.
+                    </p>
+
+                    <button id="totp-send-recovery-button" class="button button-block" type="button">
+                        Send email code
+                    </button>
+
+                    <form id="totp-recovery-form" class="stack-form" style="display: none; margin-top: 16px;">
+                        <label style="text-align: center;">
+                            Email recovery code
+                            <input id="totp-recovery-code" type="text" inputmode="numeric" pattern="[0-9]{6}"
+                                maxlength="6" autocomplete="one-time-code" placeholder="000 000"
+                                class="totp-code-input" required>
+                        </label>
+                        <button id="totp-recovery-verify-button" class="button" type="submit">
+                            Verify email code
+                        </button>
+                    </form>
+
+                    <div id="totp-recovery-setup" style="display: none; margin-top: 24px;">
+                        <h3 style="text-align: center;">Set up your new authenticator</h3>
+                        <p class="muted" style="text-align: center;">
+                            Scan this QR code, then enter the six-digit code from your authenticator app.
+                        </p>
+                        <div class="qr-presentation">
+                            <div id="totp-recovery-qr" class="qr-canvas-container"></div>
+                        </div>
+                        <div class="manual-key-box">
+                            <span class="manual-key-label">New secret key:</span>
+                            <code id="totp-recovery-secret" class="secret-key-code">LOADING...</code>
+                        </div>
+                        <form id="totp-recovery-setup-form" class="stack-form" style="margin-top: 16px;">
+                            <label style="text-align: center;">
+                                New authenticator code
+                                <input id="totp-recovery-setup-code" type="text" inputmode="numeric"
+                                    pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+                                    placeholder="000 000" class="totp-code-input" required>
+                            </label>
+                            <button id="totp-recovery-setup-button" class="button" type="submit">
+                                Complete recovery
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
             </div>
 
         </section>
@@ -205,6 +259,7 @@
     </main>
 
     <!-- Scripts -->
+    <script src="js/qrcode.min.js"></script>
     <script src="js/api.js"></script>
     <script src="js/common.js"></script>
     <script src="js/app.js"></script>

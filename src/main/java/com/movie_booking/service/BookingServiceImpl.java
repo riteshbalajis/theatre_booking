@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -14,18 +15,33 @@ import com.movie_booking.dao.BookingDao;
 import com.movie_booking.dao.BookingDaoImpl;
 import com.movie_booking.dao.BookingSeatDao;
 import com.movie_booking.dao.BookingSeatDaoImpl;
+import com.movie_booking.dao.MovieDao;
+import com.movie_booking.dao.MovieDaoImpl;
+import com.movie_booking.dao.ScreenDao;
+import com.movie_booking.dao.ScreenDaoImpl;
+import com.movie_booking.dao.SeatDao;
+import com.movie_booking.dao.SeatDaoImpl;
 import com.movie_booking.dao.ShowDao;
 import com.movie_booking.dao.ShowDaoImpl;
 import com.movie_booking.dao.ShowSeatDao;
 import com.movie_booking.dao.ShowSeatDaoImpl;
+import com.movie_booking.dao.TheatreDao;
+import com.movie_booking.dao.TheatreDaoImpl;
+import com.movie_booking.dao.UserDao;
+import com.movie_booking.dao.UserDaoImpl;
 import com.movie_booking.dto.request.RazorpayPaymentRequest;
 import com.movie_booking.dto.response.RazorpayOrderResponse;
 import com.movie_booking.model.Booking;
 import com.movie_booking.model.BookingSeat;
 import com.movie_booking.model.BookingStatus;
+import com.movie_booking.model.Movie;
+import com.movie_booking.model.Screen;
+import com.movie_booking.model.Seat;
 import com.movie_booking.model.Show;
 import com.movie_booking.model.ShowSeat;
 import com.movie_booking.model.ShowStatus;
+import com.movie_booking.model.Theatre;
+import com.movie_booking.model.User;
 import com.movie_booking.util.DBConnection;
 import com.movie_booking.util.RazorpayConfig;
 import com.razorpay.Order;
@@ -37,10 +53,18 @@ public class BookingServiceImpl implements BookingService {
     private final BookingSeatDao bookingSeatDao;
     private final ShowDao showDao;
     private final ShowSeatDao showSeatDao;
+    private final EmailService emailService;
+    private final UserDao userDao;
+    private final MovieDao movieDao;
+    private final ScreenDao screenDao;
+    private final TheatreDao theatreDao;
+    private final SeatDao seatDao;
 
     public BookingServiceImpl() {
         this(new BookingDaoImpl(), new BookingSeatDaoImpl(), new ShowDaoImpl(),
-                new ShowSeatDaoImpl());
+                new ShowSeatDaoImpl(), new EmailService(), new UserDaoImpl(),
+                new MovieDaoImpl(), new ScreenDaoImpl(), new TheatreDaoImpl(),
+                new SeatDaoImpl());
     }
 
     public BookingServiceImpl(BookingDao bookingDao, BookingSeatDao bookingSeatDao,
@@ -50,14 +74,31 @@ public class BookingServiceImpl implements BookingService {
 
     public BookingServiceImpl(BookingDao bookingDao, BookingSeatDao bookingSeatDao,
             ShowDao showDao, ShowSeatDao showSeatDao) {
+        this(bookingDao, bookingSeatDao, showDao, showSeatDao, new EmailService(),
+            new UserDaoImpl(), new MovieDaoImpl(), new ScreenDaoImpl(),
+            new TheatreDaoImpl(), new SeatDaoImpl());
+        }
+
+        public BookingServiceImpl(BookingDao bookingDao, BookingSeatDao bookingSeatDao,
+            ShowDao showDao, ShowSeatDao showSeatDao, EmailService emailService,
+            UserDao userDao, MovieDao movieDao, ScreenDao screenDao,
+            TheatreDao theatreDao, SeatDao seatDao) {
         if (bookingDao == null || bookingSeatDao == null || showDao == null
-                || showSeatDao == null) {
+            || showSeatDao == null || emailService == null || userDao == null
+            || movieDao == null || screenDao == null || theatreDao == null
+            || seatDao == null) {
             throw new IllegalArgumentException("Booking DAOs cannot be null.");
         }
         this.bookingDao = bookingDao;
         this.bookingSeatDao = bookingSeatDao;
         this.showDao = showDao;
         this.showSeatDao = showSeatDao;
+        this.emailService = emailService;
+        this.userDao = userDao;
+        this.movieDao = movieDao;
+        this.screenDao = screenDao;
+        this.theatreDao = theatreDao;
+        this.seatDao = seatDao;
     }
 
     @Override
@@ -142,6 +183,45 @@ public class BookingServiceImpl implements BookingService {
             } finally {
                 connection.setAutoCommit(true);
             }
+        }
+
+    }
+
+    private void sendTicketConfirmationEmailSafely(int bookingId) {
+        try {
+            Booking booking = bookingDao.findById(bookingId);
+            User user = userDao.findById(booking.getUserId());
+            Show show = showDao.findById(booking.getShowId());
+            Movie movie = movieDao.findById(show.getMovieId());
+            Screen screen = screenDao.findById(show.getScreenId());
+            Theatre theatre = theatreDao.findById(screen.getTheatreId());
+            List<BookingSeat> bookingSeats = bookingSeatDao.findByBookingId(bookingId);
+
+            StringBuilder seatNames = new StringBuilder();
+            for (int index = 0; index < bookingSeats.size(); index++) {
+                ShowSeat showSeat = showSeatDao.findById(bookingSeats.get(index).getShowSeatId());
+                Seat seat = seatDao.findById(showSeat.getSeatId());
+                if (index > 0) {
+                    seatNames.append(", ");
+                }
+                seatNames.append(seat.getRowLabel()).append(seat.getSeatNumber());
+            }
+
+            emailService.sendTicketConfirmationEmail(
+                    user.getEmail(),
+                    user.getName(),
+                    booking.getBookingId(),
+                    movie.getTitle(),
+                    theatre.getName(),
+                    screen.getName(),
+                    show.getShowDate().format(DateTimeFormatter.ofPattern("dd MMM yyyy")),
+                    show.getStartTime().format(DateTimeFormatter.ofPattern("hh:mm a")),
+                    seatNames.toString(),
+                    bookingSeats.size(),
+                    booking.getTotalAmount().doubleValue());
+        } catch (SQLException | RuntimeException exception) {
+            System.err.println("Booking confirmed, but ticket email could not be sent for booking "
+                    + bookingId + ": " + exception.getMessage());
         }
     }
 
@@ -483,6 +563,8 @@ public class BookingServiceImpl implements BookingService {
                 connection.setAutoCommit(true);
             }
         }
+
+        sendTicketConfirmationEmailSafely(bookingId);
     }
 
     @Override

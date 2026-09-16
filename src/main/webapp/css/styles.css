@@ -430,3 +430,176 @@ small { color: var(--muted); font-weight: 400; }
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================================================
+   THEATRES & THEATRE DETAILS PAGE STYLES
+   ========================================================= */
+
+.theatre-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.theatre-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.theatre-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(29, 42, 53, 0.12);
+}
+
+.theatre-poster-placeholder {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #176b6b 0%, #0f4f51 100%);
+  padding: 24px 16px;
+}
+
+.theatre-badge-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.theatre-poster-title {
+  font: 700 1.15rem/1.2 'Trebuchet MS', sans-serif;
+  letter-spacing: .02em;
+  color: var(--white);
+}
+
+.theatre-card:nth-child(3n) .theatre-poster-placeholder {
+  background: linear-gradient(135deg, #dc6c52 0%, #a84631 100%);
+}
+
+.theatre-card:nth-child(3n+2) .theatre-poster-placeholder {
+  background: linear-gradient(135deg, #2b5c68 0%, #173b43 100%);
+}
+
+.theatre-meta {
+  font-size: 0.95rem;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 14px;
+}
+
+.theatre-card-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 0.82rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font: 700 0.72rem/1 'Trebuchet MS', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.badge-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.badge-inactive {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+.theatre-date {
+  color: var(--muted);
+}
+
+.theatre-detail-poster {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  background: linear-gradient(135deg, var(--teal-dark) 0%, var(--teal) 100%);
+}
+
+.theatre-hero-icon {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.theatre-hero-title {
+  font-weight: 700;
+  font-size: 1.4rem;
+}
+
+.theatre-detail-address {
+  font-size: 1.15rem;
+  margin: 12px 0 10px;
+  color: var(--ink);
+}
+
+.theatre-meta-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 20px;
+  font-size: 0.95rem;
+}
+
+.theatre-screens-section {
+  margin-top: 40px;
+}
+
+.screens-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.screen-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 150px;
+  position: relative;
+  background: var(--white);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  border-radius: 4px;
+}
+
+.screen-name-display {
+  font-size: 1.3rem;
+  margin: 6px 0 8px;
+  color: var(--ink);
+}
+
+.screen-meta {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font: 0.9rem 'Trebuchet MS', sans-serif;
+}
+
+.screen-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 3px 8px;
+  background: var(--soft-teal);
+  color: var(--teal-dark);
+  border-radius: 3px;
+  font: 700 0.75rem 'Trebuchet MS', sans-serif;
+  letter-spacing: .03em;
+}

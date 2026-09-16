@@ -56,8 +56,7 @@ public class TotpResource {
             );
         }
 
-        int userId
-                = (Integer) userIdAttribute;
+        int userId = (Integer) userIdAttribute;
 
         TotpSetupResponse response
                 = totpService.setupTotp(userId);
@@ -78,13 +77,12 @@ public class TotpResource {
             );
         }
 
-        Object userIdAttribute
-                = session.getAttribute("userId");
+        Object userIdAttribute = session.getAttribute("userId");
+        boolean recoveryLogin = userIdAttribute == null
+                && isVerifiedRecoverySession(session);
 
-        if (userIdAttribute == null) {
-            throw new UnauthorizedException(
-                    "Login required."
-            );
+        if (userIdAttribute == null && !recoveryLogin) {
+            throw new UnauthorizedException("Login required.");
         }
 
         if (request == null) {
@@ -93,8 +91,9 @@ public class TotpResource {
             );
         }
 
-        int userId
-                = (Integer) userIdAttribute;
+        int userId = recoveryLogin
+                ? (Integer) session.getAttribute("totpRecoveryUserId")
+                : (Integer) userIdAttribute;
 
         boolean verified = totpService.verifySetupCode(userId, request.getCode());
 
@@ -106,6 +105,13 @@ public class TotpResource {
                             "Invalid TOTP code."
                     ))
                     .build();
+        }
+
+        if (recoveryLogin) {
+            session.removeAttribute("pendingTotpUserId");
+            session.removeAttribute("totpRecoveryUserId");
+            session.removeAttribute("totpRecoveryVerified");
+            session.setAttribute("userId", userId);
         }
 
         return Response
@@ -180,20 +186,37 @@ public class TotpResource {
             );
         }
 
-        int userId
-                = (Integer) session.getAttribute("userId");
-
-        if (userId == 0) {
-            throw new UnauthorizedException(
-                    "Login required."
-            );
-        }
+        int userId = getTotpOperationUserId(session);
 
         TotpSetupResponse response
                 = totpService.regenerateTotp(userId);
 
         return Response.ok(response).build();
     }
+
+    private int getTotpOperationUserId(HttpSession session) {
+        Object userIdAttribute = session.getAttribute("userId");
+        if (userIdAttribute instanceof Integer) {
+            return (Integer) userIdAttribute;
+        }
+
+        if (isVerifiedRecoverySession(session)) {
+            return (Integer) session.getAttribute("totpRecoveryUserId");
+        }
+
+        throw new UnauthorizedException("Login required.");
+        }
+
+    private boolean isVerifiedRecoverySession(HttpSession session) {
+        Object recoveryUserId = session.getAttribute("totpRecoveryUserId");
+        Object recoveryVerified = session.getAttribute("totpRecoveryVerified");
+        Object pendingUserId = session.getAttribute("pendingTotpUserId");
+
+        return recoveryUserId instanceof Integer
+                && Boolean.TRUE.equals(recoveryVerified)
+                && pendingUserId instanceof Integer
+                && recoveryUserId.equals(pendingUserId);
+        }
 
     @POST
     @Path("/login/verify")

@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const handlers = {
         home: loadHome,
         movies: loadMoviesPage,
+        theatres: loadTheatresPage,
+        theatre_details: loadTheatreDetails,
         login: setupLogin,
         settings: setupSettings,
         register: setupRegister,
@@ -92,6 +94,124 @@ async function loadMoviesPage() {
   render('');
 }
 
+function theatreCard(theatre) {
+  const createdDate = parseDateTime(theatre.createdAt);
+  const estText = createdDate ? `Est. ${createdDate.getFullYear()}` : '';
+  return `<article class="movie-card theatre-card">
+  <div class="poster-placeholder theatre-poster-placeholder">
+    <span class="theatre-badge-icon">🏛️</span>
+    <span class="theatre-poster-title">${escapeHtml(theatre.name)}</span>
+  </div>
+  <div class="movie-card-body">
+    <h3>${escapeHtml(theatre.name)}</h3>
+    <p class="movie-meta theatre-meta">
+      <span class="theatre-location-pin">📍</span> ${escapeHtml(theatre.location || 'Location unavailable')}
+    </p>
+    <div class="theatre-card-status">
+      <span class="status-badge ${theatre.status === 'ACTIVE' ? 'badge-active' : 'badge-inactive'}">${escapeHtml(theatre.status || 'ACTIVE')}</span>
+      ${estText ? `<span class="theatre-date">${escapeHtml(estText)}</span>` : ''}
+    </div>
+    <a class="button button-small" href="theatre-details.html?id=${theatre.theatreId}">View details</a>
+  </div>
+  </article>`;
+}
+
+async function getActiveTheatres(keyword = '') {
+  const path = keyword ? `/api/theatres?keyword=${encodeURIComponent(keyword)}` : '/api/theatres';
+  const theatres = await API.get(path);
+  return (theatres || []).filter(theatre => !theatre.status || theatre.status === 'ACTIVE');
+}
+
+async function loadTheatresPage() {
+  const list = qs('#theatre-list');
+  const message = qs('#page-message');
+  const form = qs('#theatre-search');
+
+  const render = async keyword => {
+    setMessage(message, 'Loading theatres...');
+    try {
+      const theatres = await getActiveTheatres(keyword);
+      list.innerHTML = theatres.length ? theatres.map(theatreCard).join('') : '<p class="muted">No active theatres match your search.</p>';
+      setMessage(message, '');
+    } catch (error) {
+      setMessage(message, error.message, 'error');
+    }
+  };
+
+  if (form) {
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      render(new FormData(form).get('keyword').trim());
+    });
+  }
+  render('');
+}
+
+async function loadTheatreDetails() {
+  const id = new URLSearchParams(window.location.search).get('id');
+  const detail = qs('#theatre-detail');
+  const screensList = qs('#theatre-screens-list');
+  const message = qs('#page-message');
+
+  if (!id) {
+    setMessage(message, 'A theatre ID is required.', 'error');
+    return;
+  }
+
+  setMessage(message, 'Loading theatre details...');
+  try {
+    const theatre = await API.get(`/api/theatres/${id}`);
+    const createdDate = parseDateTime(theatre.createdAt);
+    const createdDateStr = createdDate ? createdDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+
+    detail.innerHTML = `
+      <div class="detail-poster theatre-detail-poster">
+        <span class="theatre-hero-icon">🏛️</span>
+        <span class="theatre-hero-title">${escapeHtml(theatre.name)}</span>
+      </div>
+      <div class="detail-copy">
+        <p class="eyebrow">Theatre Details</p>
+        <h1>${escapeHtml(theatre.name)}</h1>
+        <p class="theatre-detail-address">
+          <strong>Location:</strong> ${escapeHtml(theatre.location || 'Location not specified')}
+        </p>
+        <p class="movie-meta theatre-meta-details">
+          <span><strong>Status:</strong> <span class="status-badge ${theatre.status === 'ACTIVE' ? 'badge-active' : 'badge-inactive'}">${escapeHtml(theatre.status || 'ACTIVE')}</span></span> &middot;
+          <span><strong>Theatre ID:</strong> #${theatre.theatreId}</span> &middot;
+          <span><strong>Registered:</strong> ${escapeHtml(createdDateStr)}</span>
+        </p>
+        <div class="theatre-quick-actions" style="margin-top: 20px;">
+          <a class="button button-small" href="movies.html">Browse Movies</a>
+        </div>
+      </div>
+    `;
+
+    try {
+      const allScreens = await API.get('/api/screens');
+      const theatreScreens = (allScreens || []).filter(screen => String(screen.theatreId) === String(id));
+
+      if (theatreScreens.length) {
+        screensList.innerHTML = theatreScreens.map(screen => `
+          <article class="show-card screen-card">
+            <span class="eyebrow">${escapeHtml(screen.status || 'ACTIVE')}</span>
+            <strong class="show-time screen-name-display">${escapeHtml(screen.name)}</strong>
+            <small>Capacity: ${screen.capacity} seats</small>
+            <span class="screen-badge">Screen #${screen.screenId}</span>
+          </article>
+        `).join('');
+      } else {
+        screensList.innerHTML = '<p class="muted">No screens are currently registered for this theatre.</p>';
+      }
+    } catch (screenError) {
+      screensList.innerHTML = '<p class="muted">Screens information unavailable at this time.</p>';
+    }
+
+    setMessage(message, '');
+  } catch (error) {
+    setMessage(message, error.message, 'error');
+  }
+}
+
 function setupLogin() {
     const loginSection = qs('#login-section');
     const form = qs('#login-form');
@@ -103,6 +223,18 @@ function setupLogin() {
     const totpMessage = qs('#totp-message');
     const totpButton = qs('#totp-verify-button');
     const totpBackButton = qs('#totp-back-button');
+    const recoveryActions = qs('#totp-recovery-actions');
+    const recoveryEmailButton = qs('#totp-recovery-email-button');
+    const recoveryPanel = qs('#totp-email-recovery');
+    const recoverySendButton = qs('#totp-send-recovery-button');
+    const recoveryForm = qs('#totp-recovery-form');
+    const recoveryCode = qs('#totp-recovery-code');
+    const recoveryVerifyButton = qs('#totp-recovery-verify-button');
+    const recoverySetup = qs('#totp-recovery-setup');
+    const recoverySecret = qs('#totp-recovery-secret');
+    const recoverySetupForm = qs('#totp-recovery-setup-form');
+    const recoverySetupCode = qs('#totp-recovery-setup-code');
+    const recoverySetupButton = qs('#totp-recovery-setup-button');
 
     const params = new URLSearchParams(window.location.search);
 
@@ -224,6 +356,88 @@ function setupLogin() {
             if (loginSection) loginSection.style.display = 'block';
         });
     }
+
+        if (recoveryEmailButton) {
+          recoveryEmailButton.addEventListener('click', () => {
+            if (recoveryPanel) recoveryPanel.style.display = 'block';
+            if (recoveryActions) recoveryActions.style.display = 'none';
+            setMessage(totpMessage, 'Choose email recovery to continue.');
+          });
+        }
+
+        if (recoverySendButton) {
+          recoverySendButton.addEventListener('click', async () => {
+            recoverySendButton.disabled = true;
+            setMessage(totpMessage, 'Sending recovery code...');
+            try {
+              await API.post('/api/totp/recovery/email/request');
+              recoverySendButton.style.display = 'none';
+              if (recoveryForm) recoveryForm.style.display = 'block';
+              setMessage(totpMessage, 'Recovery code sent. Check your email.', 'success');
+              if (recoveryCode) recoveryCode.focus();
+            } catch (error) {
+              setMessage(totpMessage, error.message, 'error');
+              recoverySendButton.disabled = false;
+            }
+          });
+        }
+
+        if (recoveryForm) {
+          recoveryForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const code = recoveryCode ? recoveryCode.value.trim() : '';
+            if (!/^\d{6}$/.test(code)) {
+              setMessage(totpMessage, 'Enter a valid 6-digit recovery code.', 'error');
+              return;
+            }
+
+            if (recoveryVerifyButton) recoveryVerifyButton.disabled = true;
+            setMessage(totpMessage, 'Verifying recovery code...');
+            try {
+              await API.post('/api/totp/recovery/email/verify', { otp: code });
+              const response = await API.post('/api/totp/regenerate');
+              if (recoveryForm) recoveryForm.style.display = 'none';
+              if (recoverySetup) recoverySetup.style.display = 'block';
+              if (recoverySecret) recoverySecret.textContent = response.secret;
+              if (window.ScreenlyQR && response.otpauthUri) {
+                ScreenlyQR.render('#totp-recovery-qr', response.otpauthUri, 180);
+              }
+              setMessage(totpMessage, 'Scan the new QR code and verify it below.', 'success');
+              if (recoverySetupCode) recoverySetupCode.focus();
+            } catch (error) {
+              setMessage(totpMessage, error.message, 'error');
+              if (recoveryVerifyButton) recoveryVerifyButton.disabled = false;
+            }
+          });
+        }
+
+        if (recoverySetupForm) {
+          recoverySetupForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const code = recoverySetupCode ? recoverySetupCode.value.trim() : '';
+            if (!/^\d{6}$/.test(code)) {
+              setMessage(totpMessage, 'Enter a valid 6-digit authenticator code.', 'error');
+              return;
+            }
+
+            if (recoverySetupButton) recoverySetupButton.disabled = true;
+            setMessage(totpMessage, 'Activating your new authenticator...');
+            try {
+              await API.post('/api/totp/setup/verify', { code: code });
+              const user = await loadCurrentUser();
+              if (user && user.userId) {
+                saveUser(user);
+                setTotpStatus(user.userId, 'ENABLED');
+              }
+              window.location.href = user && user.role === 'ADMIN'
+                ? 'admin.html'
+                : 'index.html';
+            } catch (error) {
+              setMessage(totpMessage, error.message, 'error');
+              if (recoverySetupButton) recoverySetupButton.disabled = false;
+            }
+          });
+        }
 }
 
 async function setupSettings() {
@@ -1324,9 +1538,9 @@ async function loadAllSeats() {
 async function openAdminForm(resource, item = null) {
   const config = ADMIN_CONFIG[resource]; const target = qs('[data-admin-form]');
   const formConfig = item && resource === 'shows' ? { ...config, fields: config.fields.filter(([name]) => !['regularPrice', 'premiumPrice', 'reclinerPrice'].includes(name)) } : config;
-  target.innerHTML = `<form class="admin-form"><input type="hidden" name="recordId" value="${item ? item[config.id] : ''}">${await formMarkup(formConfig, item || {})}<div class="form-actions"><button class="button" type="submit">${item ? 'Save changes' : 'Create'}</button><button class="button button-small danger" type="button" data-close-form>Close</button></div></form>`;
+  target.innerHTML = `<div data-form-message class="message" role="alert"></div><form class="admin-form"><input type="hidden" name="recordId" value="${item ? item[config.id] : ''}">${await formMarkup(formConfig, item || {})}<div class="form-actions"><button class="button" type="submit">${item ? 'Save changes' : 'Create'}</button><button class="button button-small danger" type="button" data-close-form>Close</button></div></form>`;
   target.querySelector('[data-close-form]').addEventListener('click', () => { target.innerHTML = ''; });
-  target.querySelector('form').addEventListener('submit', async event => { event.preventDefault(); const form = event.target; const values = Object.fromEntries(new FormData(form)); delete values.recordId;['movieId', 'theatreId', 'screenId', 'durationMinutes', 'capacity', 'seatNumber'].forEach(key => { if (values[key] !== undefined) values[key] = Number(values[key]); });['regularPrice', 'premiumPrice', 'reclinerPrice'].forEach(key => { if (values[key] !== undefined) values[key] = Number(values[key]); }); try { const id = form.elements.recordId.value; if (id) { await API.put(`${config.endpoint}/${id}`, values); } else { await API.post(config.endpoint, values); } await renderAdminResource(resource); } catch (error) { setMessage(qs('#page-message'), error.message, 'error'); } });
+  target.querySelector('form').addEventListener('submit', async event => { event.preventDefault(); const form = event.target; const formMessage = target.querySelector('[data-form-message]'); const values = Object.fromEntries(new FormData(form)); delete values.recordId;['movieId', 'theatreId', 'screenId', 'durationMinutes', 'capacity', 'seatNumber'].forEach(key => { if (values[key] !== undefined) values[key] = Number(values[key]); });['regularPrice', 'premiumPrice', 'reclinerPrice'].forEach(key => { if (values[key] !== undefined) values[key] = Number(values[key]); }); setMessage(formMessage, ''); try { const id = form.elements.recordId.value; if (id) { await API.put(`${config.endpoint}/${id}`, values); } else { await API.post(config.endpoint, values); } await renderAdminResource(resource); } catch (error) { setMessage(formMessage, error.message, 'error'); } });
 }
 
 async function deactivateResource(resource, id) { if (!window.confirm('Deactivate this resource?')) return; const config = ADMIN_CONFIG[resource]; try { await API.remove(`${config.endpoint}/${id}`); await renderAdminResource(resource); } catch (error) { setMessage(qs('#page-message'), error.message, 'error'); } }

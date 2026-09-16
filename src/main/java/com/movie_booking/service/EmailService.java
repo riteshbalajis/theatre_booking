@@ -39,6 +39,24 @@ public class EmailService {
         sendEmail(recipient, subject, body);
     }
 
+        public void sendTotpRecoveryOtp(String recipient, String otp) {
+
+                String subject = "Screenly - Authenticator Recovery Code";
+
+                String body
+                                = "Hello,\n\n"
+                                + "We received a request to recover access to your Screenly "
+                                + "authenticator.\n\n"
+                                + "Your authenticator recovery code is: " + otp + "\n\n"
+                                + "This code will expire in 5 minutes and can be used only once.\n\n"
+                                + "If you did not request authenticator recovery, please secure "
+                                + "your account and contact support.\n\n"
+                                + "Regards,\n"
+                                + "Screenly Team";
+
+                sendEmail(recipient, subject, body);
+        }
+
     public void sendWelcomeEmail(String recipient, String name) {
 
         String subject = "Welcome to Screenly - Account Created";
@@ -55,14 +73,45 @@ public class EmailService {
         sendEmail(recipient, subject, body);
     }
 
-    public void sendTestEmail(String recipient) {
+    public void sendTicketConfirmationEmail(
+            String recipient,
+            String userName,
+            int bookingId,
+            String movieName,
+            String theatreName,
+            String screenName,
+            String showDate,
+            String showTime,
+            String seats,
+            int seatCount,
+            double totalAmount) {
 
-        String subject = "Movie Booking - Test Email";
+        String subject = "Screenly - Booking Confirmed | Booking #" + bookingId;
 
         String body
-                = "Hello!\n\n"
-                + "This is a test email from the Movie Booking application.\n\n"
-                + "If you received this email, SMTP is working correctly.";
+                = "Hello " + userName + ",\n\n"
+                + "Your movie ticket booking has been confirmed successfully!\n\n"
+                + "----------------------------------------\n"
+                + "             BOOKING DETAILS\n"
+                + "----------------------------------------\n\n"
+                + "Booking ID  : " + bookingId + "\n"
+                + "Movie       : " + movieName + "\n"
+                + "Theatre     : " + theatreName + "\n"
+                + "Screen      : " + screenName + "\n"
+                + "Date        : " + showDate + "\n"
+                + "Show Time   : " + showTime + "\n"
+                + "Seats       : " + seats + "\n"
+                + "Seat Count  : " + seatCount + "\n"
+                + "Total Amount: ₹" + String.format("%.2f", totalAmount) + "\n\n"
+                + "----------------------------------------\n\n"
+                + "Please arrive at the theatre a few minutes before "
+                + "the show starts.\n\n"
+                + "You can view your booking and ticket details "
+                + "from the My Bookings section in Screenly.\n\n"
+                + "Thank you for booking with Screenly!\n\n"
+                + "Enjoy the movie! 🍿\n\n"
+                + "Regards,\n"
+                + "Screenly Team";
 
         sendEmail(recipient, subject, body);
     }

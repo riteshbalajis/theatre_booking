@@ -911,6 +911,10 @@ async function setupPayment() {
   const payButton = qs('#pay-razorpay-btn') || qs('#payment-button');
   const cancelButton = qs('#cancel-payment-btn');
   const message = qs('#payment-message');
+  const activeSection = qs('#payment-active-section');
+  const timeoutSection = qs('#payment-timeout-section');
+  const timeoutReason = qs('#timeout-reason-text');
+  const reselectSeatsLink = qs('#reselect-seats-link');
 
   if (!bookingId) {
     setMessage(message, 'Booking reference is required. Please select your seats again.', 'error');
@@ -920,11 +924,36 @@ async function setupPayment() {
   }
 
   let timerExpired = false;
-  let activeRazorpayInstance = null;
+  let isModalOpen = false;
+  let isPaymentProcessing = false;
   let paymentCompleted = false;
+  let activeRazorpayInstance = null;
+  let hardTimeoutId = null;
+
+  function showTimeoutView(reasonText) {
+    if (activeRazorpayInstance && typeof activeRazorpayInstance.close === 'function') {
+      try { activeRazorpayInstance.close(); } catch (ignored) {}
+    }
+    if (activeSection) activeSection.style.display = 'none';
+    if (timeoutSection) timeoutSection.style.display = 'block';
+    if (timeoutReason && reasonText) {
+      timeoutReason.textContent = reasonText;
+    }
+  }
+
+  async function triggerTimeoutCancellation(reason) {
+    if (paymentCompleted || isPaymentProcessing) return;
+    showTimeoutView(reason || 'Your 2-minute payment window has expired and your held seats have been released.');
+    try {
+      await API.remove(`/api/bookings/${bookingId}`);
+    } catch (ignored) {}
+    sessionStorage.removeItem(`booking_timer_${bookingId}`);
+    sessionStorage.removeItem(`booking_hold_${bookingId}`);
+  }
 
   async function handleCancelPayment() {
     if (paymentCompleted) return;
+    if (hardTimeoutId) clearTimeout(hardTimeoutId);
     if (payButton) payButton.disabled = true;
     if (cancelButton) cancelButton.disabled = true;
     setMessage(message, 'Cancelling booking and redirecting to home page...', 'error');
@@ -933,6 +962,7 @@ async function setupPayment() {
     } catch (e) {
       console.warn('Booking cancellation error:', e);
     }
+    sessionStorage.removeItem(`booking_timer_${bookingId}`);
     sessionStorage.removeItem(`booking_hold_${bookingId}`);
     setTimeout(() => {
       window.location.href = 'index.html?cancelled=1';
@@ -941,6 +971,7 @@ async function setupPayment() {
 
   async function handlePaymentFailure(failureReason) {
     if (paymentCompleted) return;
+    if (hardTimeoutId) clearTimeout(hardTimeoutId);
     if (payButton) payButton.disabled = true;
     if (cancelButton) cancelButton.disabled = true;
     const desc = failureReason ? `: ${failureReason}` : '';
@@ -950,6 +981,7 @@ async function setupPayment() {
     } catch (e) {
       console.warn('Booking cancellation error:', e);
     }
+    sessionStorage.removeItem(`booking_timer_${bookingId}`);
     sessionStorage.removeItem(`booking_hold_${bookingId}`);
     setTimeout(() => {
       window.location.href = 'index.html?failed=1';
@@ -1000,6 +1032,11 @@ async function setupPayment() {
       seatsElement.textContent = seatText || 'No seats recorded';
     }
 
+    if (reselectSeatsLink && booking && booking.showId) {
+      reselectSeatsLink.href = `seats.html?showId=${booking.showId}`;
+      reselectSeatsLink.style.display = 'block';
+    }
+
     if (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') {
       setMessage(message, 'This booking has already been confirmed. Opening ticket...', 'success');
       if (payButton) payButton.disabled = true;
@@ -1011,37 +1048,52 @@ async function setupPayment() {
     }
 
     if (booking.status === 'CANCELLED') {
-      setMessage(message, 'This booking has expired or was cancelled. Please select your seats again.', 'error');
-      if (payButton) payButton.disabled = true;
-      if (cancelButton) cancelButton.disabled = true;
+      showTimeoutView('This booking has expired or was cancelled. Your held seats have been released.');
       return;
     }
 
-    // Determine 2-minute deadline
-    const savedDeadline = sessionStorage.getItem(`booking_hold_${bookingId}`);
-    let holdDeadline;
-    if (savedDeadline && !isNaN(Number(savedDeadline)) && Number(savedDeadline) > Date.now() - 3600000) {
-      holdDeadline = Number(savedDeadline);
-    } else if (booking.holdUntil) {
-      const parsed = parseDateTime(booking.holdUntil);
-      holdDeadline = parsed ? parsed.getTime() : (Date.now() + 2 * 60 * 1000);
+    // 2-minute active visible payment window (120 seconds)
+    const savedTimer = sessionStorage.getItem(`booking_timer_${bookingId}`);
+    let activeDeadline;
+    if (savedTimer && !isNaN(Number(savedTimer)) && Number(savedTimer) > Date.now() - 3600000) {
+      activeDeadline = Number(savedTimer);
     } else {
-      holdDeadline = Date.now() + 2 * 60 * 1000;
+      activeDeadline = Date.now() + 2 * 60 * 1000;
     }
-    sessionStorage.setItem(`booking_hold_${bookingId}`, String(holdDeadline));
+    sessionStorage.setItem(`booking_timer_${bookingId}`, String(activeDeadline));
+
+    // Hard cutoff is 30 seconds after the 2-minute timer (at 2 minutes 30 seconds)
+    const hardCutoffTime = activeDeadline + 30 * 1000;
 
     startPaymentCountdown(
-      holdDeadline,
+      activeDeadline,
       countdownElement,
       payButton,
       message,
       () => {
         timerExpired = true;
-        if (activeRazorpayInstance && typeof activeRazorpayInstance.close === 'function') {
-          try { activeRazorpayInstance.close(); } catch (ignored) {}
+        if (!isModalOpen) {
+          // User was idle on the page and never opened Razorpay (or closed it before 2:00)
+          triggerTimeoutCancellation('Payment time has expired (2 minutes limit). Cancelling booking and returning to home...');
+        } else {
+          // User is currently inside the Razorpay modal!
+          // Give 30-second grace period for OTP authorization (until 2:30 hard cutoff).
+          setMessage(message, 'Payment window closing soon. Please complete authorization in Razorpay.', 'warning');
         }
       }
     );
+
+    // Schedule the hard cutoff at 2:30
+    const msUntilHardCutoff = hardCutoffTime - Date.now();
+    if (msUntilHardCutoff <= 0) {
+      triggerTimeoutCancellation('Payment session timed out. Cancelling booking and returning to home...');
+    } else {
+      hardTimeoutId = setTimeout(() => {
+        if (!paymentCompleted && !isPaymentProcessing) {
+          triggerTimeoutCancellation('Payment session timed out (grace period ended). Cancelling booking and returning to home...');
+        }
+      }, msUntilHardCutoff);
+    }
 
     async function launchRazorpay() {
       if (timerExpired) {
@@ -1068,8 +1120,9 @@ async function setupPayment() {
           order_id: razorpayOrder.orderId,
 
           handler: async function (response) {
+            isPaymentProcessing = true;
             console.log('Razorpay payment successful:', response);
-            setMessage(message, 'Payment verified! Opening your ticket...', 'success');
+            setMessage(message, 'Payment authorized! Verifying with server...', 'success');
             try {
               const verification = await API.post(
                 `/api/bookings/${bookingId}/razorpay_verify`,
@@ -1082,6 +1135,9 @@ async function setupPayment() {
               const verifiedBookingId = verification.bookingId;
 
               paymentCompleted = true;
+              isPaymentProcessing = false;
+              if (hardTimeoutId) clearTimeout(hardTimeoutId);
+              sessionStorage.removeItem(`booking_timer_${bookingId}`);
               sessionStorage.removeItem(`booking_hold_${bookingId}`);
               setMessage(message, 'Payment verified successfully! Opening your ticket...', 'success');
 
@@ -1089,6 +1145,7 @@ async function setupPayment() {
                 window.location.href = `booking.html?bookingId=${verifiedBookingId}`;
               }, 1000);
             } catch (error) {
+              isPaymentProcessing = false;
               console.error('Razorpay verification failed:', error);
               handlePaymentFailure(error.message || 'Payment verification failed.');
             }
@@ -1096,11 +1153,17 @@ async function setupPayment() {
 
           modal: {
             ondismiss: function () {
+              isModalOpen = false;
               if (paymentCompleted) return;
               console.log('Razorpay Checkout closed by user.');
-              setMessage(message, 'Payment window closed. Click "Pay with Razorpay" when ready to proceed before the timer runs out.', 'error');
-              if (payButton && !timerExpired) {
-                payButton.disabled = false;
+
+              if (timerExpired) {
+                triggerTimeoutCancellation('Payment time expired. Booking cancelled.');
+              } else {
+                setMessage(message, 'Payment window closed. Click "Pay with Razorpay" when ready to proceed before the timer runs out.', 'error');
+                if (payButton && !timerExpired) {
+                  payButton.disabled = false;
+                }
               }
             }
           }
@@ -1109,14 +1172,19 @@ async function setupPayment() {
         activeRazorpayInstance = new Razorpay(options);
 
         activeRazorpayInstance.on('payment.failed', function (resp) {
+          isModalOpen = false;
+          isPaymentProcessing = false;
           console.error('Razorpay payment failed:', resp.error);
           const errorDesc = resp.error && resp.error.description ? resp.error.description : 'Transaction failed';
           handlePaymentFailure(errorDesc);
         });
 
+        isModalOpen = true;
         activeRazorpayInstance.open();
         setMessage(message, 'Complete payment in the Razorpay window.');
       } catch (error) {
+        isModalOpen = false;
+        isPaymentProcessing = false;
         console.error('Error starting Razorpay:', error);
         setMessage(message, error.message || 'Unable to open Razorpay payment gateway.', 'error');
         if (!timerExpired && !paymentCompleted && payButton) payButton.disabled = false;
@@ -1144,7 +1212,6 @@ function startPaymentCountdown(deadline, countdownElement, button, message, onEx
         countdownElement.classList.add('warning');
       }
       if (button) button.disabled = true;
-      setMessage(message, 'Payment time has expired (2 minutes limit). Please return to select seats again.', 'error');
       if (onExpire) onExpire();
       return false;
     }

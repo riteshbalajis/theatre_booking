@@ -39,6 +39,7 @@ com\movie_booking\model\Movie.class
 com\movie_booking\model\ShowSeat.class
 com\movie_booking\dto\response\UserResponse.class
 com\movie_booking\dto\request\ShowUpdateRequest.class
+com\movie_booking\service\AdminTicketService.class
 com\movie_booking\service\ShowServiceImpl.class
 com\movie_booking\service\SeatServiceImpl.class
 com\movie_booking\service\EmailService.class
@@ -68,12 +69,14 @@ com\movie_booking\model\Booking.class
 com\movie_booking\model\PasswordResetToken.class
 com\movie_booking\service\BookingService.class
 com\movie_booking\config\BookingCleanupListener.class
+com\movie_booking\dto\request\TicketCheckInRequest.class
 com\movie_booking\service\UserService.class
 com\movie_booking\dao\MovieDaoImpl.class
 com\movie_booking\dto\request\BookTicketsRequest.class
 com\movie_booking\dao\SeatDaoImpl.class
 com\movie_booking\resource\SeatResource.class
 com\movie_booking\dto\response\TotpRecoveryResponse.class
+com\movie_booking\service\AdminTicketServiceImpl.class
 com\movie_booking\dto\request\TotpRecoveryVerifyRequest.class
 com\movie_booking\service\SeatService.class
 com\movie_booking\dto\response\RegisterResponse.class
@@ -81,6 +84,7 @@ com\movie_booking\dto\response\SeatResponse.class
 com\movie_booking\model\UserStatus.class
 com\movie_booking\dto\request\SeatCreateRequest.class
 com\movie_booking\dto\request\SeatUpdateRequest.class
+com\movie_booking\resource\AdminTicketResource.class
 com\movie_booking\dao\TheatreDao.class
 com\movie_booking\dto\request\ShowCreateRequest.class
 com\movie_booking\config\MailConfig.class
@@ -102,6 +106,7 @@ com\movie_booking\dto\request\MovieUpdateRequest.class
 com\movie_booking\dto\request\RegisterRequest.class
 com\movie_booking\resource\TotpResource.class
 com\movie_booking\service\ShowSeatServiceImpl.class
+com\movie_booking\dto\response\TicketCheckInResponse.class
 com\movie_booking\model\BookingSeat.class
 com\movie_booking\model\UserRole.class
 com\movie_booking\model\Screen.class

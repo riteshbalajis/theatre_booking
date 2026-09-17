@@ -12,11 +12,11 @@
   <div id="site-header"></div>
 
   <main class="auth-shell">
-    <section class="form-panel">
+    <section id="payment-active-section" class="form-panel">
       <p class="eyebrow">Confirm booking</p>
       <h1>Complete your booking</h1>
       <p class="muted">
-        Pay securely with Razorpay to confirm your tickets.
+        Review your booking details and pay securely with Razorpay to confirm your tickets.
       </p>
 
       <div class="booking-summary-card">
@@ -60,6 +60,24 @@
       <p class="form-footer">
         <a href="index.html">Cancel &amp; return to home</a>
       </p>
+    </section>
+
+    <section id="payment-timeout-section" class="form-panel" style="display: none; text-align: center;">
+      <div style="font-size: 3.2rem; margin-bottom: 12px;">⏱️</div>
+      <p class="eyebrow" style="color: var(--coral);">Session Expired</p>
+      <h1>Payment Timed Out</h1>
+      <p id="timeout-reason-text" class="muted" style="margin: 12px 0 24px; font-size: 0.98rem; line-height: 1.5;">
+        Your 2-minute payment window has expired and your held seats have been released.
+      </p>
+
+      <div class="payment-actions" style="display: flex; flex-direction: column; gap: 12px;">
+        <a href="index.html" class="button button-block" id="go-home-btn" style="text-decoration: none;">
+          Go to Home Page
+        </a>
+        <a href="#" id="reselect-seats-link" class="button button-block button-light" style="display: none; text-decoration: none;">
+          Select Seats Again
+        </a>
+      </div>
     </section>
   </main>
 

@@ -41,6 +41,7 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\request\ShowCreateRequest.j
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\ShowUpdateRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\TheatreCreateRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\TheatreUpdateRequest.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\request\TicketCheckInRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\TotpRecoveryVerifyRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\TotpVerifyRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\UserUpdateRequest.java
@@ -63,6 +64,7 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowSeatCountRespo
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowSeatResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreCreateResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreResponse.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\response\TicketCheckInResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpRecoveryResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpSetupResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\UserResponse.java
@@ -104,6 +106,7 @@ D:\movie_booking\src\main\java\com\movie_booking\model\TotpRecoveryToken.java
 D:\movie_booking\src\main\java\com\movie_booking\model\User.java
 D:\movie_booking\src\main\java\com\movie_booking\model\UserRole.java
 D:\movie_booking\src\main\java\com\movie_booking\model\UserStatus.java
+D:\movie_booking\src\main\java\com\movie_booking\resource\AdminTicketResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\AuthResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\BookingResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\EmailTestResource.java
@@ -115,6 +118,8 @@ D:\movie_booking\src\main\java\com\movie_booking\resource\ShowSeatResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\TheatreResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\TotpRecoveryResource.java
 D:\movie_booking\src\main\java\com\movie_booking\resource\TotpResource.java
+D:\movie_booking\src\main\java\com\movie_booking\service\AdminTicketService.java
+D:\movie_booking\src\main\java\com\movie_booking\service\AdminTicketServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\AuthenticationRequiredException.java
 D:\movie_booking\src\main\java\com\movie_booking\service\AuthorizationException.java
 D:\movie_booking\src\main\java\com\movie_booking\service\BookingAccessException.java

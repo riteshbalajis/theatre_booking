@@ -140,7 +140,7 @@ public class BookingServiceImpl implements BookingService {
                 BigDecimal totalAmount = BigDecimal.ZERO;
                 List<BookingSeat> bookingSeats = new ArrayList<>();
 
-                LocalDateTime holdUntil = LocalDateTime.now().plusMinutes(2);
+                LocalDateTime holdUntil = LocalDateTime.now().plusSeconds(210);
                 for (int showSeatId : orderedSeatIds) {
                     ShowSeat showSeat = showSeatDao.findById(connection, showSeatId);
                     if (showSeat == null || showSeat.getShowId() != showId

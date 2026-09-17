@@ -56,6 +56,14 @@ public interface BookingDao {
             TicketStatus ticketStatus
         ) throws SQLException;
 
+            Booking findByTicketCode(String ticketCode) throws SQLException;
+
+            Booking findByTicketCode(Connection connection, String ticketCode)
+                throws SQLException;
+
+            boolean markTicketAsUsed(Connection connection, String ticketCode)
+                throws SQLException;
+
     int cancelExpiredBookings(Connection connection) throws SQLException;
 
 }

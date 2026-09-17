@@ -202,6 +202,51 @@ public class BookingDaoImpl implements BookingDao {
     }
 
     @Override
+    public Booking findByTicketCode(String ticketCode) throws SQLException {
+        try (Connection connection = DBConnection.getConnection()) {
+            return findByTicketCode(connection, ticketCode);
+        }
+    }
+
+    @Override
+    public Booking findByTicketCode(
+            Connection connection,
+            String ticketCode
+    ) throws SQLException {
+        if (ticketCode == null || ticketCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Ticket code is required.");
+        }
+
+        String sql = BASE_SELECT + " WHERE ticket_code = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, ticketCode.trim());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? mapBooking(resultSet) : null;
+            }
+        }
+    }
+
+    @Override
+    public boolean markTicketAsUsed(
+            Connection connection,
+            String ticketCode
+    ) throws SQLException {
+        if (ticketCode == null || ticketCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Ticket code is required.");
+        }
+
+        String sql = "UPDATE bookings SET ticket_status = ? "
+                + "WHERE ticket_code = ? AND ticket_status = ?";
+
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, TicketStatus.USED.name());
+            statement.setString(2, ticketCode.trim());
+            statement.setString(3, TicketStatus.VALID.name());
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    @Override
     public boolean cancelBooking(int bookingId) throws SQLException {
         return updateStatus(bookingId, BookingStatus.CANCELLED);
     }

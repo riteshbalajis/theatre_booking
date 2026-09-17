@@ -1,11 +1,13 @@
 package com.movie_booking.dao;
 
-import com.movie_booking.model.Show;
-import com.movie_booking.model.ShowStatus;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+
+import com.movie_booking.dto.response.TheatreShowsResponse;
+import com.movie_booking.model.Show;
+import com.movie_booking.model.ShowStatus;
 
 public interface ShowDao {
     int createShow(Show show) throws SQLException;
@@ -26,9 +28,11 @@ public interface ShowDao {
 
     List<Show> findShowsByMovieAndDate(int movieId, LocalDate showDate) throws SQLException;
 
+    List<TheatreShowsResponse> findGroupedShowsByMovieAndDate(int movieId, LocalDate showDate) throws SQLException;
+
     List<Show> findShowsByScreenAndDate(int screenId, LocalDate showDate) throws SQLException;
 
-    List<Show> findShowsByTheatreAndDate(int theatreId, LocalDate showDate) throws SQLException;
+    TheatreShowsResponse findShowsByTheatreAndDate(int theatreId, LocalDate showDate) throws SQLException;
 
     List<Show> findUpcomingShows() throws SQLException;
 

@@ -12,6 +12,8 @@ public interface UserDao {
 
     int createUser(User user) throws SQLException;
 
+    int createUser(Connection connection, User user) throws SQLException;
+
     User findById(int userId) throws SQLException;
 
     User findByEmail(String email) throws SQLException;

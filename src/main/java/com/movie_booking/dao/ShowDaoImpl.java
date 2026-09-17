@@ -1,8 +1,6 @@
 package com.movie_booking.dao;
 
-import com.movie_booking.model.Show;
-import com.movie_booking.model.ShowStatus;
-import com.movie_booking.util.DBConnection;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -12,8 +10,17 @@ import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+
+import com.movie_booking.dto.response.ShowSlotResponse;
+import com.movie_booking.dto.response.TheatreShowsResponse;
+import com.movie_booking.model.Show;
+import com.movie_booking.model.ShowStatus;
+import com.movie_booking.util.DBConnection;
 
 public class ShowDaoImpl implements ShowDao {
     private static final String BASE_SELECT = "SELECT show_id, movie_id, screen_id, show_date, "
@@ -101,6 +108,91 @@ public class ShowDaoImpl implements ShowDao {
             return readShows(statement);
         }
     }
+    
+
+    @Override
+    public List<TheatreShowsResponse> findGroupedShowsByMovieAndDate(int movieId, LocalDate showDate)
+            throws SQLException {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        // If the date is in the past, all shows have already ended
+        if (showDate.isBefore(today)) {
+            return new ArrayList<>();
+        }
+
+        boolean isToday = showDate.equals(today);
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT s.show_id, s.screen_id, s.start_time, s.end_time, s.status, "
+                + "sc.name AS screen_name, "
+                + "t.theatre_id, t.name AS theatre_name, t.location AS theatre_location, "
+                + "(SELECT MIN(ss.price) FROM show_seats ss WHERE ss.show_id = s.show_id) AS min_price "
+                + "FROM shows s "
+                + "JOIN screens sc ON s.screen_id = sc.screen_id "
+                + "JOIN theatres t ON sc.theatre_id = t.theatre_id "
+                + "WHERE s.movie_id = ? AND s.show_date = ? AND s.status != 'CANCELLED' "
+        );
+
+        if (isToday) {
+            // End time must be greater than current time
+            sql.append("AND s.end_time > ? ");
+        }
+
+        sql.append("ORDER BY t.name, sc.name, s.start_time");
+
+        Map<Integer, TheatreShowsResponse> theatreMap = new LinkedHashMap<>();
+
+        try (Connection connection = DBConnection.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+            statement.setInt(1, movieId);
+            statement.setDate(2, Date.valueOf(showDate));
+            if (isToday) {
+                statement.setTime(3, Time.valueOf(now));
+            }
+
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    int theatreId = rs.getInt("theatre_id");
+                    TheatreShowsResponse theatre = theatreMap.get(theatreId);
+                    if (theatre == null) {
+                        theatre = new TheatreShowsResponse(
+                                theatreId,
+                                rs.getString("theatre_name"),
+                                rs.getString("theatre_location")
+                        );
+                        theatreMap.put(theatreId, theatre);
+                    }
+
+                    ShowSlotResponse slot = new ShowSlotResponse();
+                    slot.setShowId(rs.getInt("show_id"));
+                    slot.setScreenId(rs.getInt("screen_id"));
+                    slot.setScreenName(rs.getString("screen_name"));
+
+                    Time startTime = rs.getTime("start_time");
+                    slot.setStartTime(startTime == null ? null : startTime.toLocalTime());
+
+                    Time endTime = rs.getTime("end_time");
+                    slot.setEndTime(endTime == null ? null : endTime.toLocalTime());
+
+                    String statusStr = rs.getString("status");
+                    if (statusStr != null) {
+                        try {
+                            slot.setStatus(ShowStatus.valueOf(statusStr));
+                        } catch (IllegalArgumentException ignored) {
+                            slot.setStatus(ShowStatus.SCHEDULED);
+                        }
+                    }
+
+                    BigDecimal minPrice = rs.getBigDecimal("min_price");
+                    slot.setRegularPrice(minPrice);
+
+                    theatre.addShow(slot);
+                }
+            }
+        }
+        return new ArrayList<>(theatreMap.values());
+    }
 
     @Override
     public List<Show> findShowsByScreenAndDate(int screenId, LocalDate showDate)
@@ -115,20 +207,85 @@ public class ShowDaoImpl implements ShowDao {
     }
 
     @Override
-    public List<Show> findShowsByTheatreAndDate(int theatreId, LocalDate showDate)
+    public TheatreShowsResponse findShowsByTheatreAndDate(int theatreId, LocalDate showDate)
             throws SQLException {
-        String sql = "SELECT s.show_id, s.movie_id, s.screen_id, s.show_date, s.start_time, "
-                + "s.end_time, s.status, s.created_at FROM shows s "
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        if (showDate.isBefore(today)) {
+            return new TheatreShowsResponse(theatreId, null, null);
+        }
+
+        boolean isToday = showDate.equals(today);
+        StringBuilder sql = new StringBuilder(
+                "SELECT s.show_id, s.screen_id, s.start_time, s.end_time, s.status, "
+                + "sc.name AS screen_name, "
+                + "t.name AS theatre_name, t.location AS theatre_location, "
+                + "(SELECT MIN(ss.price) FROM show_seats ss WHERE ss.show_id = s.show_id) AS min_price "
+                + "FROM shows s "
                 + "JOIN screens sc ON s.screen_id = sc.screen_id "
-                + "WHERE sc.theatre_id = ? AND s.show_date = ?"
-                + " ORDER BY s.show_date, s.start_time";
+                + "JOIN theatres t ON sc.theatre_id = t.theatre_id "
+                + "WHERE t.theatre_id = ? AND s.show_date = ? "
+                + "AND s.status != 'CANCELLED' ");
+
+        if (isToday) {
+            sql.append("AND s.end_time > ? ");
+        }
+        sql.append("ORDER BY sc.name, s.start_time");
+
+        TheatreShowsResponse theatreShows = null;
+        List<ShowSlotResponse> shows = new ArrayList<>();
         try (Connection connection = DBConnection.getConnection();
-                PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql.toString())) {
             statement.setInt(1, theatreId);
             statement.setDate(2, Date.valueOf(showDate));
-            return readShows(statement);
+            if (isToday) {
+                statement.setTime(3, Time.valueOf(now));
+            }
+
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    if (theatreShows == null) {
+                        theatreShows = new TheatreShowsResponse(
+                                theatreId,
+                                rs.getString("theatre_name"),
+                                rs.getString("theatre_location")
+                        );
+                    }
+
+                    ShowSlotResponse slot = new ShowSlotResponse();
+                    slot.setShowId(rs.getInt("show_id"));
+                    slot.setScreenId(rs.getInt("screen_id"));
+                    slot.setScreenName(rs.getString("screen_name"));
+
+                    Time startTime = rs.getTime("start_time");
+                    slot.setStartTime(startTime == null ? null : startTime.toLocalTime());
+
+                    Time endTime = rs.getTime("end_time");
+                    slot.setEndTime(endTime == null ? null : endTime.toLocalTime());
+
+                    String statusStr = rs.getString("status");
+                    if (statusStr != null) {
+                        try {
+                            slot.setStatus(ShowStatus.valueOf(statusStr));
+                        } catch (IllegalArgumentException ignored) {
+                            slot.setStatus(ShowStatus.SCHEDULED);
+                        }
+                    }
+
+                    BigDecimal minPrice = rs.getBigDecimal("min_price");
+                    slot.setRegularPrice(minPrice);
+
+                    shows.add(slot);
+                }
+            }
         }
+        if (theatreShows == null) {
+            theatreShows = new TheatreShowsResponse(theatreId, null, null);
+        }
+        theatreShows.setShows(shows);
+        return theatreShows;
     }
+    
 
     @Override
     public List<Show> findUpcomingShows() throws SQLException {

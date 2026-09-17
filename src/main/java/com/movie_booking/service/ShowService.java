@@ -1,10 +1,12 @@
 package com.movie_booking.service;
 
-import com.movie_booking.model.Show;
-import com.movie_booking.model.ShowStatus;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+
+import com.movie_booking.dto.response.TheatreShowsResponse;
+import com.movie_booking.model.Show;
+import com.movie_booking.model.ShowStatus;
 
 public interface ShowService {
     int addShow(Show show, int authenticatedUserId) throws SQLException;
@@ -21,9 +23,14 @@ public interface ShowService {
 
     List<Show> getShowsByMovieAndDate(int movieId, LocalDate showDate) throws SQLException;
 
+    List<TheatreShowsResponse> getGroupedShowsByMovieAndDate(int movieId, LocalDate showDate) throws SQLException;
+
     List<Show> getShowsByScreenAndDate(int screenId, LocalDate showDate) throws SQLException;
 
-    List<Show> getShowsByTheatreAndDate(int theatreId, LocalDate showDate) throws SQLException;
+        TheatreShowsResponse getShowsByTheatreAndDate(
+            int theatreId,
+            LocalDate showDate
+        ) throws SQLException;
 
     List<Show> getUpcomingShows() throws SQLException;
 

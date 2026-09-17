@@ -46,6 +46,7 @@ import com.movie_booking.model.ShowStatus;
 import com.movie_booking.model.Theatre;
 import com.movie_booking.model.TicketStatus;
 import com.movie_booking.model.User;
+import com.movie_booking.model.UserRole;
 import com.movie_booking.util.DBConnection;
 import com.movie_booking.util.RazorpayConfig;
 import com.razorpay.Order;
@@ -120,7 +121,7 @@ public class BookingServiceImpl implements BookingService {
     public int createBookingWithSeats(int authenticatedUserId, int showId,
             List<Integer> showSeatIds)
             throws SQLException {
-        requireAuthenticatedUser(authenticatedUserId);
+        requireCustomerUser(authenticatedUserId);
         requirePositiveId(showId, "Show ID");
         validateSeatIds(showSeatIds);
 
@@ -334,7 +335,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public void confirmPayment(int authenticatedUserId, int bookingId, String pin) throws SQLException {
-        requireAuthenticatedUser(authenticatedUserId);
+        requireCustomerUser(authenticatedUserId);
         requirePositiveId(bookingId, "Booking ID");
 
         if (!"1234".equals(pin)) {
@@ -393,7 +394,7 @@ public class BookingServiceImpl implements BookingService {
     public RazorpayOrderResponse createRazorpayOrder(
             int authenticatedUserId, int bookingId) throws SQLException {
 
-        requireAuthenticatedUser(authenticatedUserId);
+        requireCustomerUser(authenticatedUserId);
         requirePositiveId(bookingId, "Booking ID");
 
         Booking booking = bookingDao.findById(bookingId);
@@ -452,7 +453,7 @@ public class BookingServiceImpl implements BookingService {
     public void verifyRazorpayPayment(int authenticatedUserId, int bookingId, RazorpayPaymentRequest request)
             throws SQLException {
 
-        requireAuthenticatedUser(authenticatedUserId);
+        requireCustomerUser(authenticatedUserId);
         requirePositiveId(bookingId, "Booking ID");
 
         if (request == null) {
@@ -696,6 +697,14 @@ public class BookingServiceImpl implements BookingService {
     private static void requireAuthenticatedUser(int authenticatedUserId) {
         if (authenticatedUserId <= 0) {
             throw new AuthenticationRequiredException();
+        }
+    }
+
+    private void requireCustomerUser(int authenticatedUserId) throws SQLException {
+        requireAuthenticatedUser(authenticatedUserId);
+        User user = userDao.findById(authenticatedUserId);
+        if (user != null && user.getRole() == UserRole.ADMIN) {
+            throw new IllegalArgumentException("Administrators are not permitted to book tickets.");
         }
     }
 

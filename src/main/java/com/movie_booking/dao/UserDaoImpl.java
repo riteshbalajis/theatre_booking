@@ -21,11 +21,18 @@ public class UserDaoImpl implements UserDao {
 
     @Override
     public int createUser(User user) throws SQLException {
+        try (Connection connection = DBConnection.getConnection()) {
+            return createUser(connection, user);
+        }
+    }
+
+    @Override
+    public int createUser(Connection connection, User user) throws SQLException {
         String sql = "INSERT INTO users "
                 + "(name, email, password_hash, google_sub, phone, role, status) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection connection = DBConnection.getConnection(); PreparedStatement statement = connection.prepareStatement(sql,
+        try (PreparedStatement statement = connection.prepareStatement(sql,
                 Statement.RETURN_GENERATED_KEYS)) {
             statement.setString(1, user.getName());
             statement.setString(2, user.getEmail());

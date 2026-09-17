@@ -152,6 +152,9 @@ async function loadTheatreDetails() {
   const detail = qs('#theatre-detail');
   const screensList = qs('#theatre-screens-list');
   const message = qs('#page-message');
+  const showDateInput = qs('#theatre-show-date');
+  const showList = qs('#theatre-show-list');
+  const showMessage = qs('#theatre-show-message');
 
   if (!id) {
     setMessage(message, 'A theatre ID is required.', 'error');
@@ -181,7 +184,7 @@ async function loadTheatreDetails() {
           <span><strong>Registered:</strong> ${escapeHtml(createdDateStr)}</span>
         </p>
         <div class="theatre-quick-actions" style="margin-top: 20px;">
-          <a class="button button-small" href="movies.html">Browse Movies</a>
+          <a class="button button-small" href="#theatre-show-list">Browse Shows</a>
         </div>
       </div>
     `;
@@ -204,6 +207,53 @@ async function loadTheatreDetails() {
       }
     } catch (screenError) {
       screensList.innerHTML = '<p class="muted">Screens information unavailable at this time.</p>';
+    }
+
+    if (showDateInput && showList) {
+      showDateInput.value = todayIso();
+
+      const loadTheatreShows = async () => {
+        setMessage(showMessage, 'Loading showtimes...');
+        showList.innerHTML = '';
+        try {
+          const response = await API.get(
+            `/api/theatres/${id}/shows/${showDateInput.value}`
+          );
+          const shows = response && response.shows ? response.shows : [];
+
+          if (!shows.length) {
+            showList.innerHTML = '<p class="muted">No shows are scheduled for this date.</p>';
+            setMessage(showMessage, '');
+            return;
+          }
+
+          showList.innerHTML = `
+            <article class="theatre-show-group">
+              <div class="theatre-show-header">
+                <div class="theatre-name-wrap">
+                  <h3 class="theatre-name">${escapeHtml(response.theatreName || theatre.name)}</h3>
+                  ${response.theatreLocation ? `<span class="theatre-location"><span class="loc-pin">📍</span> ${escapeHtml(response.theatreLocation)}</span>` : ''}
+                </div>
+              </div>
+              <div class="show-slots-grid">
+                ${shows.map(show => `
+                  <a class="show-slot-box" href="seats.html?showId=${show.showId}"
+                     title="${escapeHtml(show.screenName || 'Screen ' + show.screenId)}: ${formatTime(show.startTime)} - ${formatTime(show.endTime)}">
+                    <span class="slot-screen">${escapeHtml(show.screenName || 'Screen ' + show.screenId)}</span>
+                    <strong class="slot-time">${formatTime(show.startTime)}</strong>
+                    <span class="slot-action">${show.regularPrice ? 'From ₹' + show.regularPrice : 'Select Seats'}</span>
+                  </a>
+                `).join('')}
+              </div>
+            </article>`;
+          setMessage(showMessage, '');
+        } catch (error) {
+          setMessage(showMessage, error.message, 'error');
+        }
+      };
+
+      showDateInput.addEventListener('change', loadTheatreShows);
+      loadTheatreShows();
     }
 
     setMessage(message, '');
@@ -899,6 +949,11 @@ async function createRazorpayOrder(bookingId) {
 async function setupPayment() {
   if (!requireLogin()) return;
 
+  if (currentUser && currentUser.role === 'ADMIN') {
+    window.location.href = 'admin.html';
+    return;
+  }
+
   const params = new URLSearchParams(window.location.search);
   let bookingId = params.get('bookingId') || params.get('id') || params.get('booking_id');
   if (bookingId === 'undefined' || bookingId === 'null') {
@@ -1247,15 +1302,56 @@ function startPaymentCountdown(deadline, countdownElement, button, message, onEx
 function setupRegister() {
   const form = qs('#register-form');
   const message = qs('#form-message');
+  const fields = qs('#registration-fields');
+  const submitButton = qs('#register-submit-button');
+  const verification = qs('#registration-verification');
+  const verificationForm = qs('#registration-verification-form');
+  const otpInput = qs('#registration-otp');
+  const verifyButton = qs('#registration-verify-button');
+  let registrationId = null;
+
+  if (!form || !verificationForm) return;
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    setMessage(message, 'Creating account...');
+    setMessage(message, 'Sending verification code...');
     const data = Object.fromEntries(new FormData(form));
+    if (submitButton) submitButton.disabled = true;
     try {
-      await API.post('/api/auth/register', data);
+      const response = await API.post('/api/auth/register', data);
+      registrationId = response.registrationId;
+      if (fields) fields.style.display = 'none';
+      if (submitButton) submitButton.style.display = 'none';
+      if (verification) verification.style.display = 'block';
+      setMessage(message, response.message || 'Verification code sent to your email.', 'success');
+      if (otpInput) otpInput.focus();
+    } catch (error) {
+      setMessage(message, error.message, 'error');
+      if (submitButton) submitButton.disabled = false;
+    }
+  });
+
+  verificationForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const otp = otpInput ? otpInput.value.trim() : '';
+    if (!/^\d{6}$/.test(otp)) {
+      setMessage(message, 'Enter a valid 6-digit verification code.', 'error');
+      return;
+    }
+    if (!registrationId) {
+      setMessage(message, 'Registration verification is not available. Please start again.', 'error');
+      return;
+    }
+
+    if (verifyButton) verifyButton.disabled = true;
+    setMessage(message, 'Verifying email...');
+    try {
+      await API.post('/api/auth/register/verify', { registrationId, otp });
       window.location.href = 'login.html?registered=1';
     } catch (error) {
       setMessage(message, error.message, 'error');
+      if (verifyButton) verifyButton.disabled = false;
+      if (otpInput) otpInput.focus();
     }
   });
 }
@@ -1309,13 +1405,35 @@ async function loadDetails() {
     setMessage(message, 'Loading showtimes...');
     list.innerHTML = '';
     try {
-      const shows = await API.get(`/api/shows/movie/${id}/date/${dateInput.value}`);
-      list.innerHTML = shows.length ? shows.map(show => `<article class="show-card">
-        <span class="eyebrow">${escapeHtml(show.status)}</span>
-        <strong class="show-time">${formatTime(show.startTime)} - ${formatTime(show.endTime)}</strong>
-        <small>Screen ${show.screenId}</small>
-        <a class="button button-small" href="seats.html?showId=${show.showId}">Choose seats</a>
-        </article>`).join('') : '<p class="muted">No shows are scheduled for this date.</p>';
+      const theatres = await API.get(`/api/shows/movie/${id}/date/${dateInput.value}`);
+      const isAdmin = currentUser && currentUser.role === 'ADMIN';
+
+      if (!theatres || theatres.length === 0) {
+        list.innerHTML = '<p class="muted">No shows are scheduled for this date.</p>';
+        setMessage(message, '');
+        return;
+      }
+
+      list.innerHTML = theatres.map(theatre => `
+        <article class="theatre-show-group">
+          <div class="theatre-show-header">
+            <div class="theatre-name-wrap">
+              <h3 class="theatre-name">${escapeHtml(theatre.theatreName)}</h3>
+              ${theatre.theatreLocation ? `<span class="theatre-location"><span class="loc-pin">📍</span> ${escapeHtml(theatre.theatreLocation)}</span>` : ''}
+            </div>
+            ${isAdmin ? `<span class="badge admin-pill">Admin View</span>` : ''}
+          </div>
+          <div class="show-slots-grid">
+            ${(theatre.shows || []).map(show => `
+              <a class="show-slot-box" href="seats.html?showId=${show.showId}" title="${escapeHtml(show.screenName || 'Screen ' + show.screenId)}: ${formatTime(show.startTime)} - ${formatTime(show.endTime)}">
+                <span class="slot-screen">${escapeHtml(show.screenName || 'Screen ' + show.screenId)}</span>
+                <strong class="slot-time">${formatTime(show.startTime)}</strong>
+                <span class="slot-action">${isAdmin ? 'View Layout' : (show.regularPrice ? 'From ₹' + show.regularPrice : 'Select Seats')}</span>
+              </a>
+            `).join('')}
+          </div>
+        </article>
+      `).join('');
       setMessage(message, '');
     }
     catch (error) {
@@ -1328,6 +1446,7 @@ async function loadDetails() {
 async function loadSeats() {
   if (!requireLogin()) return;
 
+  const isAdmin = currentUser && currentUser.role === 'ADMIN';
   const showId = new URLSearchParams(window.location.search).get('showId');
   const map = qs('#seat-map');
   const summary = qs('#show-summary');
@@ -1335,6 +1454,15 @@ async function loadSeats() {
   const total = qs('#total-amount');
   const button = qs('#confirm-booking');
   const message = qs('#page-message');
+  const sidebar = qs('.booking-summary');
+
+  if (isAdmin) {
+    const headingEyebrow = qs('.page-heading .eyebrow');
+    const headingH1 = qs('.page-heading h1');
+    if (headingEyebrow) headingEyebrow.innerHTML = '<span class="badge" style="background:#0f766e;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin-right:6px;">ADMIN MODE</span> View-only seat layout';
+    if (headingH1) headingH1.textContent = 'Seat Layout & Availability';
+  }
+
   if (!showId) { setMessage(message, 'A show is required.', 'error'); return; }
   const selected = new Map();
   try {
@@ -1342,11 +1470,40 @@ async function loadSeats() {
     summary.textContent = `${formatDate(show.showDate)} | ${formatTime(show.startTime)} - ${formatTime(show.endTime)} | Screen ${show.screenId}`;
     const seats = await API.get(`/api/show-seats/show/${showId}`);
     renderSeatMap(seats);
+    if (isAdmin && sidebar) {
+      renderAdminSidebar(seats);
+    }
   }
   catch (error) {
     setMessage(message, error.message, 'error');
     return;
   }
+
+  function renderAdminSidebar(seats) {
+    const totalSeats = seats.length;
+    const availableSeats = seats.filter(s => (s.status || '').toUpperCase() === 'AVAILABLE').length;
+    const bookedSeats = seats.filter(s => (s.status || '').toUpperCase() === 'BOOKED').length;
+    const heldSeats = seats.filter(s => ['HELD', 'HOLD'].includes((s.status || '').toUpperCase())).length;
+
+    sidebar.innerHTML = `
+      <h2>Seat Availability</h2>
+      <div style="margin: 12px 0 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; font-size: 0.85rem; color: #166534; line-height: 1.4;">
+        <strong>Admin Preview Mode</strong><br>
+        Seat selection, booking, and payments are disabled for administrator accounts.
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; font-size: 0.95rem;">
+        <div style="display: flex; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px solid var(--line);"><span>Total Screen Seats:</span><strong>${totalSeats}</strong></div>
+        <div style="display: flex; justify-content: space-between; color: #0d9488;"><span>Available:</span><strong>${availableSeats}</strong></div>
+        <div style="display: flex; justify-content: space-between; color: #dc2626;"><span>Booked:</span><strong>${bookedSeats}</strong></div>
+        <div style="display: flex; justify-content: space-between; color: #d97706;"><span>On Hold:</span><strong>${heldSeats}</strong></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <a href="admin.html" class="button" style="text-align: center; text-decoration: none;">Return to Dashboard</a>
+        <a href="movies.html" class="button button-small" style="text-align: center; text-decoration: none; background: transparent; color: var(--muted); border: 1px solid var(--line);">Browse Movies</a>
+      </div>
+    `;
+  }
+
   function renderSeatMap(seats) {
     const rows = {};
     seats.forEach(seat => { (rows[seat.rowLabel || '?'] ||= []).push(seat); });
@@ -1375,53 +1532,61 @@ async function loadSeats() {
               labelSuffix = ' (Unavailable)';
             }
 
-            const disabledAttr = !isAvailable ? 'disabled' : '';
+            if (isAdmin) {
+              statusClass += ' admin-view';
+            }
+
+            const disabledAttr = (isAdmin || !isAvailable) ? 'disabled' : '';
             return `<button class="seat ${statusClass}" data-seat-id="${seat.showSeatId}" data-price="${seat.price}" ${disabledAttr} aria-label="Row ${escapeHtml(row)} seat ${seat.seatNumber}${labelSuffix}">${seat.seatNumber}</button>`;
           }).join('')}
         </div>`
       ).join('');
 
-    map.querySelectorAll('.seat.available:not([disabled])').forEach(seat => seat.addEventListener('click', () => {
-      const seatId = Number(seat.dataset.seatId);
-      if (selected.has(seatId)) {
-        selected.delete(seatId);
-        seat.classList.remove('selected');
-      }
-      else {
-        selected.set(seatId, Number(seat.dataset.price));
-        seat.classList.add('selected');
-      }
-      updateSummary();
-    }));
+    if (!isAdmin) {
+      map.querySelectorAll('.seat.available:not([disabled])').forEach(seat => seat.addEventListener('click', () => {
+        const seatId = Number(seat.dataset.seatId);
+        if (selected.has(seatId)) {
+          selected.delete(seatId);
+          seat.classList.remove('selected');
+        }
+        else {
+          selected.set(seatId, Number(seat.dataset.price));
+          seat.classList.add('selected');
+        }
+        updateSummary();
+      }));
+    }
   }
-
-
 
   function updateSummary() {
+    if (isAdmin) return;
     const entries = [...selected.entries()];
-    selectedLabel.textContent = entries.length ? entries.map(([id]) => `Seat ${id}`).join(', ') : 'No seats selected';
-    total.textContent = formatMoney(entries.reduce((sum, [, price]) => sum + price, 0));
-    button.disabled = !entries.length;
+    if (selectedLabel) selectedLabel.textContent = entries.length ? entries.map(([id]) => `Seat ${id}`).join(', ') : 'No seats selected';
+    if (total) total.textContent = formatMoney(entries.reduce((sum, [, price]) => sum + price, 0));
+    if (button) button.disabled = !entries.length;
   }
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    setMessage(message, 'Confirming booking...');
-    try {
-      const result = await API.post('/api/bookings', { showId: Number(showId), showSeatIds: [...selected.keys()] });
-      const bookingId = result && (result.bookingId ?? result.bookingId ?? result.booking_id ?? result.id);
-      const parsedHold = result && result.holdUntil ? parseDateTime(result.holdUntil) : null;
-      const holdTime = parsedHold ? parsedHold.getTime() : (Date.now() + 2 * 60 * 1000);
-      if (bookingId) {
-        sessionStorage.setItem(`booking_hold_${bookingId}`, String(holdTime));
-        window.location.href = `payment.html?bookingId=${bookingId}`;
-      } else {
-        throw new Error('Booking created but reference ID is missing.');
+
+  if (!isAdmin && button) {
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      setMessage(message, 'Confirming booking...');
+      try {
+        const result = await API.post('/api/bookings', { showId: Number(showId), showSeatIds: [...selected.keys()] });
+        const bookingId = result && (result.bookingId ?? result.bookingId ?? result.booking_id ?? result.id);
+        const parsedHold = result && result.holdUntil ? parseDateTime(result.holdUntil) : null;
+        const holdTime = parsedHold ? parsedHold.getTime() : (Date.now() + 2 * 60 * 1000);
+        if (bookingId) {
+          sessionStorage.setItem(`booking_hold_${bookingId}`, String(holdTime));
+          window.location.href = `payment.html?bookingId=${bookingId}`;
+        } else {
+          throw new Error('Booking created but reference ID is missing.');
+        }
       }
-    }
-    catch (error) {
-      button.disabled = false; setMessage(message, error.message, 'error');
-    }
-  });
+      catch (error) {
+        button.disabled = false; setMessage(message, error.message, 'error');
+      }
+    });
+  }
 }
 
 function renderTicketCard(booking, show, movie, screen) {
@@ -1523,6 +1688,15 @@ async function loadBookings() {
   if (!requireLogin()) return;
   const list = qs('#booking-list');
   const message = qs('#page-message');
+
+  if (currentUser && currentUser.role === 'ADMIN') {
+    list.innerHTML = `<div style="padding: 24px; background: var(--white); border: 1px solid var(--line); border-radius: 6px;">
+      <h3>Administrator Account</h3>
+      <p class="muted" style="margin: 8px 0 16px;">Admins do not possess customer ticket bookings. To manage cinema shows, movies, and screens, visit the Admin Dashboard.</p>
+      <a href="admin.html" class="button button-small">Go to Admin Dashboard</a>
+    </div>`;
+    return;
+  }
   const params = new URLSearchParams(window.location.search);
   const bookedId = params.get('booked') || params.get('bookingId') || params.get('id');
 
@@ -1677,7 +1851,21 @@ function setupAdminTicketCheckin() {
 async function adminOptions(type) {
   if (type === 'select-movie') return API.get('/api/movies');
   if (type === 'select-theatre') return API.get('/api/theatres');
-  if (type === 'select-screen') return API.get('/api/screens');
+  if (type === 'select-screen') {
+    try {
+      const [screens, theatres] = await Promise.all([
+        API.get('/api/screens'),
+        API.get('/api/theatres')
+      ]);
+      const theatreMap = new Map((theatres || []).map(t => [t.theatreId, t.name]));
+      return (screens || []).map(s => ({
+        ...s,
+        label: `${theatreMap.get(s.theatreId) || 'Theatre ' + s.theatreId} - ${s.name}`
+      }));
+    } catch (e) {
+      return API.get('/api/screens');
+    }
+  }
   return [];
 }
 
@@ -1685,7 +1873,16 @@ function optionMarkup(type, values, current = '') {
   if (type === 'select-seat-type') values = ['REGULAR', 'PREMIUM', 'RECLINER'].map(value => ({ value, label: value }));
   const fieldName = { 'select-seat-type': 'seatType', 'select-movie': 'movieId', 'select-theatre': 'theatreId', 'select-screen': 'screenId' }[type];
   const immutableOnUpdate = current && ['select-theatre', 'select-screen'].includes(type);
-  return `<select name="${fieldName}" ${immutableOnUpdate ? 'disabled' : ''} required><option value="">Select</option>${values.map(item => { const value = item.value ?? item.movieId ?? item.theatreId ?? item.screenId; const label = item.label ?? item.title ?? item.name; return `<option value="${value}" ${String(value) === String(current) ? 'selected' : ''}>${escapeHtml(label)}</option>`; }).join('')}</select>`;
+  return `<select name="${fieldName}" ${immutableOnUpdate ? 'disabled' : ''} required><option value="">Select</option>${values.map(item => {
+    let value = '';
+    if (type === 'select-screen') value = item.screenId;
+    else if (type === 'select-theatre') value = item.theatreId;
+    else if (type === 'select-movie') value = item.movieId;
+    else if (type === 'select-seat-type') value = item.value;
+    else value = item.value ?? item.screenId ?? item.theatreId ?? item.movieId;
+    const label = item.label ?? item.title ?? item.name;
+    return `<option value="${value}" ${String(value) === String(current) ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('')}</select>`;
 }
 
 async function formMarkup(config, item = {}) {
@@ -1693,8 +1890,19 @@ async function formMarkup(config, item = {}) {
     const value = item[name] ?? '';
     if (type.startsWith('select-')) return `<label>${label}${optionMarkup(type, await adminOptions(type), value)}</label>`;
     if (type === 'textarea') return `<label class="wide">${label}<textarea name="${name}" ${required ? 'required' : ''}>${escapeHtml(value)}</textarea></label>`;
-    const timeVal = type === 'time' ? (formatTime(value) === 'Time unavailable' ? '' : formatTime(value)) : value;
-    return `<label>${label}<input name="${name}" type="${type}" value="${escapeHtml(timeVal)}" ${required ? 'required' : ''} ${type === 'number' ? 'min="0" step="0.01"' : ''}></label>`;
+    let inputVal = value;
+    if (type === 'time') {
+      inputVal = (formatTime(value) === 'Time unavailable' ? '' : formatTime(value));
+    } else if (type === 'date') {
+      if (Array.isArray(value)) {
+        const [y, m, d] = value;
+        inputVal = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      } else if (typeof value === 'string' && value.includes(',')) {
+        const parts = value.split(',').map(p => p.trim());
+        inputVal = `${parts[0]}-${(parts[1] || '01').padStart(2, '0')}-${(parts[2] || '01').padStart(2, '0')}`;
+      }
+    }
+    return `<label>${label}<input name="${name}" type="${type}" value="${escapeHtml(inputVal)}" ${required ? 'required' : ''} ${type === 'number' ? 'min="0" step="0.01"' : ''}></label>`;
   }));
   return fields.join('');
 }
@@ -1702,7 +1910,7 @@ async function formMarkup(config, item = {}) {
 async function renderAdminResource(resource) {
   const config = ADMIN_CONFIG[resource]; const workspace = qs('#admin-workspace'); const message = qs('#page-message');
   workspace.innerHTML = '<p class="muted">Loading resource...</p>';
-  try { const items = resource === 'seats' ? await loadAllSeats() : await API.get(config.endpoint); const rows = items || []; workspace.innerHTML = `<div class="admin-toolbar"><h2>${config.title}</h2><button class="button button-small" data-new-resource>New ${config.title.slice(0, -1)}</button></div><div data-admin-form></div><table class="admin-table"><thead><tr>${config.columns.map(([, label]) => `<th>${label}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr>${config.columns.map(([key]) => { let cellVal = item[key]; if (key === 'startTime' || key === 'endTime') cellVal = formatTime(cellVal); else if (key === 'showDate') cellVal = formatDate(cellVal); return `<td>${escapeHtml(cellVal)}</td>`; }).join('')}<td><div class="admin-actions"><button class="button button-small" data-edit="${item[config.id]}">Edit</button><button class="button button-small danger" data-delete="${item[config.id]}">Deactivate</button></div></td></tr>`).join('')}</tbody></table>`; workspace.querySelector('[data-new-resource]').addEventListener('click', () => openAdminForm(resource)); workspace.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openAdminForm(resource, rows.find(item => String(item[config.id]) === button.dataset.edit)))); workspace.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deactivateResource(resource, button.dataset.delete))); setMessage(message, rows.length ? '' : `No ${config.title.toLowerCase()} found.`); } catch (error) { setMessage(message, error.message, 'error'); workspace.innerHTML = ''; }
+  try { const items = resource === 'seats' ? await loadAllSeats() : await API.get(config.endpoint); const rows = items || []; workspace.innerHTML = `<div class="admin-toolbar"><h2>${config.title}</h2><button class="button button-small" data-new-resource>New ${config.title.slice(0, -1)}</button></div><div data-admin-form></div><table class="admin-table"><thead><tr>${config.columns.map(([, label]) => `<th>${label}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr>${config.columns.map(([key]) => { let cellVal = item[key]; if (key === 'startTime' || key === 'endTime') cellVal = formatTime(cellVal); else if (key === 'showDate' || key === 'releaseDate') cellVal = formatDate(cellVal); return `<td>${escapeHtml(cellVal)}</td>`; }).join('')}<td><div class="admin-actions"><button class="button button-small" data-edit="${item[config.id]}">Edit</button><button class="button button-small danger" data-delete="${item[config.id]}">Deactivate</button></div></td></tr>`).join('')}</tbody></table>`; workspace.querySelector('[data-new-resource]').addEventListener('click', () => openAdminForm(resource)); workspace.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openAdminForm(resource, rows.find(item => String(item[config.id]) === button.dataset.edit)))); workspace.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deactivateResource(resource, button.dataset.delete))); setMessage(message, rows.length ? '' : `No ${config.title.toLowerCase()} found.`); } catch (error) { setMessage(message, error.message, 'error'); workspace.innerHTML = ''; }
 }
 
 async function loadAllSeats() {

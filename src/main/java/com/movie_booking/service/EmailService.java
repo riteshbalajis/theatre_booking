@@ -57,6 +57,26 @@ public class EmailService {
                 sendEmail(recipient, subject, body);
         }
 
+        public void sendRegistrationVerificationOtp(
+                        String recipient,
+                        String name,
+                        String otp) {
+
+                String subject = "Screenly - Verify Your Email";
+
+                String body
+                                = "Hello " + name + ",\n\n"
+                                + "Thank you for registering with Screenly.\n\n"
+                                + "Your email verification code is: " + otp + "\n\n"
+                                + "This code will expire in 5 minutes and can be used only once.\n\n"
+                                + "If you did not create this registration request, please ignore "
+                                + "this email.\n\n"
+                                + "Regards,\n"
+                                + "Screenly Team";
+
+                sendEmail(recipient, subject, body);
+        }
+
     public void sendWelcomeEmail(String recipient, String name) {
 
         String subject = "Welcome to Screenly - Account Created";

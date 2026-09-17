@@ -12,6 +12,7 @@ import com.movie_booking.dao.ShowSeatDao;
 import com.movie_booking.dao.ShowSeatDaoImpl;
 import com.movie_booking.dao.UserDao;
 import com.movie_booking.dao.UserDaoImpl;
+import com.movie_booking.dto.response.TheatreShowsResponse;
 import com.movie_booking.exception.ValidationException;
 import com.movie_booking.model.Show;
 import com.movie_booking.model.ShowStatus;
@@ -112,6 +113,14 @@ public class ShowServiceImpl implements ShowService {
     }
 
     @Override
+    public List<TheatreShowsResponse> getGroupedShowsByMovieAndDate(int movieId, LocalDate showDate)
+            throws SQLException {
+        requirePositiveId(movieId, "Movie ID");
+        requireDate(showDate);
+        return showDao.findGroupedShowsByMovieAndDate(movieId, showDate);
+    }
+
+    @Override
     public List<Show> getShowsByScreenAndDate(int screenId, LocalDate showDate)
             throws SQLException {
         requirePositiveId(screenId, "Screen ID");
@@ -120,7 +129,7 @@ public class ShowServiceImpl implements ShowService {
     }
 
     @Override
-    public List<Show> getShowsByTheatreAndDate(int theatreId, LocalDate showDate)
+    public TheatreShowsResponse getShowsByTheatreAndDate(int theatreId, LocalDate showDate)
             throws SQLException {
         requirePositiveId(theatreId, "Theatre ID");
         requireDate(showDate);

@@ -2,6 +2,7 @@ com\movie_booking\dto\response\LoginResponse.class
 com\movie_booking\model\ShowStatus.class
 com\movie_booking\util\GoogleTokenVerifier.class
 com\movie_booking\service\ShowSeatService.class
+com\movie_booking\dto\response\ShowSlotResponse.class
 com\movie_booking\resource\ShowResource.class
 com\movie_booking\model\ShowSeatStatus.class
 com\movie_booking\service\TotpServiceImpl.class
@@ -14,6 +15,7 @@ com\movie_booking\resource\BookingResource.class
 com\movie_booking\dto\response\RazorpayOrderResponse.class
 com\movie_booking\exception\InvalidCredentialsExceptionMapper.class
 com\movie_booking\model\TheatreStatus.class
+com\movie_booking\dto\response\TheatreShowsResponse.class
 com\movie_booking\dto\response\BookingCreatedResponse.class
 com\movie_booking\dto\response\ShowResponse.class
 com\movie_booking\resource\ShowSeatResource.class
@@ -42,6 +44,7 @@ com\movie_booking\dto\request\ShowUpdateRequest.class
 com\movie_booking\service\AdminTicketService.class
 com\movie_booking\service\ShowServiceImpl.class
 com\movie_booking\service\SeatServiceImpl.class
+com\movie_booking\service\RegistrationService.class
 com\movie_booking\service\EmailService.class
 com\movie_booking\dto\response\BookingSeatResponse.class
 com\movie_booking\dto\response\BookingResponse.class
@@ -50,9 +53,11 @@ com\movie_booking\resource\TotpRecoveryResource.class
 com\movie_booking\service\TheatreService.class
 com\movie_booking\dto\request\TotpVerifyRequest.class
 com\movie_booking\dto\response\MovieResponse.class
+com\movie_booking\service\RegistrationServiceImpl.class
 com\movie_booking\model\SeatType.class
 com\movie_booking\dao\TheatreDaoImpl.class
 com\movie_booking\exception\ScreenNotFoundException.class
+com\movie_booking\config\ObjectMapperContextResolver.class
 com\movie_booking\service\TotpRecoveryServiceImpl.class
 com\movie_booking\model\PendingRegistration.class
 com\movie_booking\service\TotpRecoveryService.class
@@ -72,6 +77,7 @@ com\movie_booking\config\BookingCleanupListener.class
 com\movie_booking\dto\request\TicketCheckInRequest.class
 com\movie_booking\service\UserService.class
 com\movie_booking\dao\MovieDaoImpl.class
+com\movie_booking\dao\RegistrationVerificationTokenDao.class
 com\movie_booking\dto\request\BookTicketsRequest.class
 com\movie_booking\dao\SeatDaoImpl.class
 com\movie_booking\resource\SeatResource.class
@@ -94,6 +100,7 @@ com\movie_booking\dao\ScreenDao.class
 com\movie_booking\exception\UnauthorizedExceptionMapper.class
 com\movie_booking\dto\request\TheatreUpdateRequest.class
 com\movie_booking\dao\TotpRecoveryTokenDao.class
+com\movie_booking\dao\RegistrationVerificationTokenDaoImpl.class
 com\movie_booking\model\ScreenStatus.class
 com\movie_booking\util\RazorpayConfig.class
 com\movie_booking\service\AuthenticationRequiredException.class

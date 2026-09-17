@@ -1,6 +1,7 @@
 D:\movie_booking\src\main\java\com\movie_booking\config\BookingCleanupListener.java
 D:\movie_booking\src\main\java\com\movie_booking\config\JerseyApplication.java
 D:\movie_booking\src\main\java\com\movie_booking\config\MailConfig.java
+D:\movie_booking\src\main\java\com\movie_booking\config\ObjectMapperContextResolver.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\BookingDao.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\BookingDaoImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\BookingSeatDao.java
@@ -9,6 +10,8 @@ D:\movie_booking\src\main\java\com\movie_booking\dao\MovieDao.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\MovieDaoImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\PasswordResetTokenDao.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\PasswordResetTokenDaoImpl.java
+D:\movie_booking\src\main\java\com\movie_booking\dao\RegistrationVerificationTokenDao.java
+D:\movie_booking\src\main\java\com\movie_booking\dao\RegistrationVerificationTokenDaoImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\ScreenDao.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\ScreenDaoImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\dao\SeatDao.java
@@ -62,8 +65,10 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\response\SeatResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowSeatCountResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowSeatResponse.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowSlotResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreCreateResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreResponse.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreShowsResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TicketCheckInResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpRecoveryResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpSetupResponse.java
@@ -128,6 +133,8 @@ D:\movie_booking\src\main\java\com\movie_booking\service\BookingServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\EmailService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\MovieService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\MovieServiceImpl.java
+D:\movie_booking\src\main\java\com\movie_booking\service\RegistrationService.java
+D:\movie_booking\src\main\java\com\movie_booking\service\RegistrationServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\ScreenService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\ScreenServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\SeatService.java
@@ -136,6 +143,7 @@ D:\movie_booking\src\main\java\com\movie_booking\service\ShowSeatService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\ShowSeatServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\ShowService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\ShowServiceImpl.java
+D:\movie_booking\src\main\java\com\movie_booking\service\SmsGatewayService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TheatreService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TheatreServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TotpRecoveryService.java
@@ -144,14 +152,6 @@ D:\movie_booking\src\main\java\com\movie_booking\service\TotpService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\TotpServiceImpl.java
 D:\movie_booking\src\main\java\com\movie_booking\service\UserService.java
 D:\movie_booking\src\main\java\com\movie_booking\service\UserServiceImpl.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\AuthServletbackup.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\BookingServlet.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\MovieServlet.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\ScreenServlet.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\SeatServlet.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\ShowSeatServlet.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\ShowServlet.java
-D:\movie_booking\src\main\java\com\movie_booking\servlet\TheatreServlet.java
 D:\movie_booking\src\main\java\com\movie_booking\util\DBConnection.java
 D:\movie_booking\src\main\java\com\movie_booking\util\GoogleTokenVerifier.java
 D:\movie_booking\src\main\java\com\movie_booking\util\RazorpayConfig.java

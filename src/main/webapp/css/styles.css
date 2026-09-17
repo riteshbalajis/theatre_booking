@@ -66,7 +66,22 @@ small { color: var(--muted); font-weight: 400; }
 .detail-poster { min-height: 280px; padding: 22px; display: flex; align-items: end; background: var(--teal); color: var(--white); font-size: 1.8rem; }
 .detail-copy p { max-width: 680px; color: var(--muted); }
 .date-picker { min-width: 180px; }
-.show-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
+.show-list { display: flex; flex-direction: column; gap: 20px; }
+.theatre-show-group { padding: 22px 24px; background: var(--white); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.theatre-show-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid #edf2f4; }
+.theatre-name-wrap { display: flex; flex-direction: column; gap: 4px; }
+.theatre-name { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--ink); }
+.theatre-location { font-size: 0.85rem; color: var(--muted); font-family: 'Trebuchet MS', sans-serif; display: flex; align-items: center; gap: 4px; }
+.theatre-location .loc-pin { font-size: 0.85rem; }
+.admin-pill { background: #0f766e; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-family: 'Trebuchet MS', sans-serif; font-weight: 700; text-transform: uppercase; }
+.show-slots-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+.show-slot-box { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 130px; padding: 12px 18px; background: #fbfdfc; border: 1.5px solid var(--line); border-radius: 6px; text-decoration: none; color: var(--ink); cursor: pointer; transition: all 0.2s ease; }
+.show-slot-box:hover { background: var(--soft-teal); border-color: var(--teal); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(23, 107, 107, 0.15); }
+.slot-screen { font-size: 0.72rem; font-weight: 700; font-family: 'Trebuchet MS', sans-serif; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal); margin-bottom: 4px; }
+.slot-time { font-size: 1.2rem; font-family: 'Trebuchet MS', sans-serif; font-weight: 700; color: var(--ink); }
+.show-slot-box:hover .slot-time { color: var(--teal-dark); }
+.slot-action { margin-top: 5px; font-size: 0.75rem; color: var(--muted); font-family: 'Trebuchet MS', sans-serif; }
+.show-slot-box:hover .slot-action { color: var(--teal); font-weight: 600; }
 .show-card { padding: 18px; background: var(--white); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .show-time { display: block; margin: 5px 0; font-size: 1.45rem; }
 .show-card small { display: block; margin-bottom: 14px; font-family: 'Trebuchet MS', sans-serif; }
@@ -81,6 +96,8 @@ small { color: var(--muted); font-weight: 400; }
 .seat.booked { color: #99a4a6; background: #edf0f0; border-color: #d6dddd; cursor: not-allowed; }
 .seat.held { color: #b45309; background: #fef3c7; border-color: #fde68a; cursor: not-allowed; }
 .seat:disabled { cursor: not-allowed; }
+.seat.admin-view { cursor: default !important; }
+.seat.admin-view.available { background: var(--soft-teal); border-color: var(--teal); color: var(--teal-dark); opacity: 0.95; }
 .legend { display: flex; justify-content: center; gap: 18px; margin-top: 26px; color: var(--muted); font: .8rem 'Trebuchet MS', sans-serif; }
 .legend span { display: flex; gap: 6px; align-items: center; }
 .seat-dot { width: 12px; height: 12px; display: inline-block; background: var(--soft-teal); border: 1px solid var(--teal); }

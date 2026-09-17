@@ -22,6 +22,7 @@ import com.movie_booking.dto.request.ShowCreateRequest;
 import com.movie_booking.dto.request.ShowUpdateRequest;
 import com.movie_booking.dto.response.CreateResponse;
 import com.movie_booking.dto.response.ShowResponse;
+import com.movie_booking.dto.response.TheatreShowsResponse;
 import com.movie_booking.exception.ResourceNotFoundException;
 import com.movie_booking.exception.UnauthorizedException;
 import com.movie_booking.exception.ValidationException;
@@ -73,17 +74,14 @@ public class ShowResource {
 
     @GET
     @Path("/movie/{movieId}/date/{date}")
-    public List<ShowResponse> getShowsByMovieAndDate(@PathParam("movieId") int movieId, @PathParam("date") String date) throws java.sql.SQLException {
+    public List<TheatreShowsResponse> getShowsByMovieAndDate(@PathParam("movieId") int movieId, @PathParam("date") String date) throws java.sql.SQLException {
         LocalDate localDate;
         try {
             localDate = LocalDate.parse(date);
         } catch (Exception e) {
             throw new ValidationException("Invalid date format. Expected format: YYYY-MM-DD");
         }
-        List<Show> shows = showService.getShowsByMovieAndDate(movieId, localDate);
-        return shows.stream()
-                .map(show -> toShowResponse(show))
-                .collect(Collectors.toList());
+        return showService.getGroupedShowsByMovieAndDate(movieId, localDate);
     }
 
     @GET

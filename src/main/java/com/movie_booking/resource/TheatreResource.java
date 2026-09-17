@@ -1,6 +1,7 @@
 package com.movie_booking.resource;
 
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,9 +24,12 @@ import com.movie_booking.dto.request.TheatreCreateRequest;
 import com.movie_booking.dto.response.MessageResponse;
 import com.movie_booking.dto.response.TheatreCreateResponse;
 import com.movie_booking.dto.response.TheatreResponse;
+import com.movie_booking.dto.response.TheatreShowsResponse;
 import com.movie_booking.exception.TheatreNotFoundException;
 import com.movie_booking.exception.UnauthorizedException;
 import com.movie_booking.model.Theatre;
+import com.movie_booking.service.ShowService;
+import com.movie_booking.service.ShowServiceImpl;
 import com.movie_booking.service.TheatreService;
 import com.movie_booking.service.TheatreServiceImpl;
 
@@ -36,9 +40,11 @@ import com.movie_booking.service.TheatreServiceImpl;
 public class TheatreResource {
 
     private TheatreService theatreService;
+    private final ShowService showService;
 
     public TheatreResource() {
         this.theatreService = new TheatreServiceImpl();
+        this.showService = new ShowServiceImpl();
     }
 
     
@@ -68,6 +74,28 @@ public class TheatreResource {
             throw new TheatreNotFoundException("Theatre not found with ID: " + theatreId);
         }
         return toTheatreResponse(theatre);
+    }
+
+    @GET
+    @Path("/{theatreId}/shows")
+    public TheatreShowsResponse getTodayShowsByTheatre(
+            @PathParam("theatreId") int theatreId) throws SQLException {
+        return showService.getShowsByTheatreAndDate(theatreId, LocalDate.now());
+    }
+
+    @GET
+    @Path("/{theatreId}/shows/{date}")
+    public TheatreShowsResponse getShowsByTheatreAndDate(
+            @PathParam("theatreId") int theatreId,
+            @PathParam("date") String date) throws SQLException {
+        try {
+            return showService.getShowsByTheatreAndDate(
+                    theatreId,
+                    LocalDate.parse(date));
+        } catch (java.time.format.DateTimeParseException exception) {
+            throw new com.movie_booking.exception.ValidationException(
+                    "Invalid date format. Expected format: YYYY-MM-DD");
+        }
     }
 
 

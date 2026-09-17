@@ -67,7 +67,8 @@ function renderHeader() {
   target.innerHTML = `<header class="navbar"><a class="brand" href="index.html">SCREENLY</a>
   <nav class="nav-links"><a href="movies.html">Movies</a>
   <a href="theatres.html">Theatres</a>
-  ${user ? '<a href="bookings.html">My bookings</a><a href="settings.html">Settings</a>' : ''}
+  ${user && user.role !== 'ADMIN' ? '<a href="bookings.html">My bookings</a>' : ''}
+  ${user ? '<a href="settings.html">Settings</a>' : ''}
   ${user && user.role === 'ADMIN' ? '<a href="admin.html">Admin</a>' : ''}
   ${user ? `<span class="nav-user">${escapeHtml(user.name)}</span>
   <a href="#" data-logout>Log out</a>` : '<a href="login.html">Log in</a><a class="button button-small register-button" href="register.html">Register</a>'}</nav></header>`;

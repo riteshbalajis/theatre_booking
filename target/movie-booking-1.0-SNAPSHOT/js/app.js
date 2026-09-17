@@ -1637,9 +1637,41 @@ const ADMIN_CONFIG = {
 
 async function loadAdmin() {
   if (!requireAdmin()) return;
+  setupAdminTicketCheckin();
   const tabs = qs('#admin-tabs');
   tabs.addEventListener('click', event => { const tab = event.target.closest('[data-resource]'); if (!tab) return; tabs.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item === tab)); renderAdminResource(tab.dataset.resource); });
   renderAdminResource('movies');
+}
+
+function setupAdminTicketCheckin() {
+  const form = qs('#ticket-checkin-form');
+  const input = qs('#ticket-checkin-code');
+  const button = qs('#ticket-checkin-button');
+  const message = qs('#ticket-checkin-message');
+  if (!form || !input || !button || !message) return;
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const ticketCode = input.value.trim();
+    if (!ticketCode) {
+      setMessage(message, 'Enter a ticket code.', 'error');
+      return;
+    }
+
+    button.disabled = true;
+    setMessage(message, 'Checking ticket...');
+    try {
+      const result = await API.post('/api/admin/tickets/checkin', { ticketCode });
+      setMessage(message, `${result.message} ${result.bookingId ? `Booking #${result.bookingId}.` : ''}`, 'success');
+      input.value = '';
+      input.focus();
+    } catch (error) {
+      setMessage(message, error.message || 'Ticket could not be verified.', 'error');
+      input.select();
+    } finally {
+      button.disabled = false;
+    }
+  });
 }
 
 async function adminOptions(type) {

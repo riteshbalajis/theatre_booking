@@ -25,6 +25,7 @@ import com.movie_booking.dto.response.BookingResponse;
 import com.movie_booking.dto.response.BookingSeatResponse;
 import com.movie_booking.dto.response.MessageResponse;
 import com.movie_booking.dto.response.RazorpayOrderResponse;
+import com.movie_booking.dto.response.RazorpayVerificationResponse;
 import com.movie_booking.exception.ResourceNotFoundException;
 import com.movie_booking.exception.UnauthorizedException;
 import com.movie_booking.model.Booking;
@@ -126,7 +127,7 @@ public class BookingResource {
 
     @POST
     @Path("/{bookingId}/razorpay_verify")
-    public void verifyRazorpayPayment(
+    public RazorpayVerificationResponse verifyRazorpayPayment(
             @PathParam("bookingId") int bookingId,
             RazorpayPaymentRequest request) throws SQLException {
 
@@ -136,6 +137,10 @@ public class BookingResource {
                 userId,
                 bookingId,
                 request);
+
+        return new RazorpayVerificationResponse(
+            bookingId,
+            "Payment verified successfully. Booking confirmed.");
     }
 
     @DELETE
@@ -160,6 +165,8 @@ public class BookingResource {
         response.setShowId(booking.getShowId());
         response.setTotalAmount(booking.getTotalAmount());
         response.setStatus(booking.getStatus());
+        response.setTicketCode(booking.getTicketCode());
+        response.setTicketStatus(booking.getTicketStatus());
         response.setBookedAt(booking.getBookedAt());
 
         try {

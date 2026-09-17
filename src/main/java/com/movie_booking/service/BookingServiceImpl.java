@@ -1,11 +1,14 @@
 package com.movie_booking.service;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +44,7 @@ import com.movie_booking.model.Show;
 import com.movie_booking.model.ShowSeat;
 import com.movie_booking.model.ShowStatus;
 import com.movie_booking.model.Theatre;
+import com.movie_booking.model.TicketStatus;
 import com.movie_booking.model.User;
 import com.movie_booking.util.DBConnection;
 import com.movie_booking.util.RazorpayConfig;
@@ -49,6 +53,8 @@ import com.razorpay.RazorpayClient;
 import com.razorpay.Utils;
 
 public class BookingServiceImpl implements BookingService {
+    private static final SecureRandom TICKET_CODE_RANDOM = new SecureRandom();
+
     private final BookingDao bookingDao;
     private final BookingSeatDao bookingSeatDao;
     private final ShowDao showDao;
@@ -370,7 +376,7 @@ public class BookingServiceImpl implements BookingService {
                     throw new IllegalStateException("Booking could not be confirmed.");
                 }
 
-               
+                assignTicketCode(connection, bookingId);
 
                 connection.commit();
 
@@ -553,6 +559,8 @@ public class BookingServiceImpl implements BookingService {
                             "Booking could not be confirmed.");
                 }
 
+                assignTicketCode(connection, bookingId);
+
                 connection.commit();
 
             } catch (SQLException | RuntimeException exception) {
@@ -565,6 +573,38 @@ public class BookingServiceImpl implements BookingService {
         }
 
         sendTicketConfirmationEmailSafely(bookingId);
+    }
+
+    private void assignTicketCode(Connection connection, int bookingId)
+            throws SQLException {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            String ticketCode = generateTicketCode();
+            try {
+                if (bookingDao.assignTicketDetails(
+                        connection,
+                        bookingId,
+                        ticketCode,
+                        TicketStatus.VALID)) {
+                    return;
+                }
+                throw new IllegalStateException(
+                        "Ticket details could not be assigned.");
+            } catch (SQLIntegrityConstraintViolationException exception) {
+                if (attempt == 2) {
+                    throw new SQLException(
+                            "Unable to generate a unique ticket code.",
+                            exception);
+                }
+            }
+        }
+    }
+
+    private static String generateTicketCode() {
+        byte[] randomBytes = new byte[24];
+        TICKET_CODE_RANDOM.nextBytes(randomBytes);
+        return "SCN-" + Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(randomBytes);
     }
 
     @Override

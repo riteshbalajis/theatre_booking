@@ -32,6 +32,7 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\request\MovieUpdateRequest.
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\PaymentRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\RazorpayPaymentRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\RegisterRequest.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\request\RegistrationVerifyRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\ScreenCreateRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\ScreenUpdateRequest.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\request\SeatCreateRequest.java
@@ -52,7 +53,9 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\response\LoginResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\MessageResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\MovieResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\RazorpayOrderResponse.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\response\RazorpayVerificationResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\RegisterResponse.java
+D:\movie_booking\src\main\java\com\movie_booking\dto\response\RegistrationResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\ScreenResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\SeatResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\ShowResponse.java
@@ -63,6 +66,8 @@ D:\movie_booking\src\main\java\com\movie_booking\dto\response\TheatreResponse.ja
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpRecoveryResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\TotpSetupResponse.java
 D:\movie_booking\src\main\java\com\movie_booking\dto\response\UserResponse.java
+D:\movie_booking\src\main\java\com\movie_booking\exception\GenericExceptionMapper.java
+D:\movie_booking\src\main\java\com\movie_booking\exception\IllegalArgumentExceptionMapper.java
 D:\movie_booking\src\main\java\com\movie_booking\exception\InvalidCredentialsException.java
 D:\movie_booking\src\main\java\com\movie_booking\exception\InvalidCredentialsExceptionMapper.java
 D:\movie_booking\src\main\java\com\movie_booking\exception\MovieNotFoundException.java
@@ -81,6 +86,7 @@ D:\movie_booking\src\main\java\com\movie_booking\model\BookingStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\Movie.java
 D:\movie_booking\src\main\java\com\movie_booking\model\MovieStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\PasswordResetToken.java
+D:\movie_booking\src\main\java\com\movie_booking\model\PendingRegistration.java
 D:\movie_booking\src\main\java\com\movie_booking\model\Screen.java
 D:\movie_booking\src\main\java\com\movie_booking\model\ScreenStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\Seat.java
@@ -92,6 +98,7 @@ D:\movie_booking\src\main\java\com\movie_booking\model\ShowSeatStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\ShowStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\Theatre.java
 D:\movie_booking\src\main\java\com\movie_booking\model\TheatreStatus.java
+D:\movie_booking\src\main\java\com\movie_booking\model\TicketStatus.java
 D:\movie_booking\src\main\java\com\movie_booking\model\TotpRecoveryMethod.java
 D:\movie_booking\src\main\java\com\movie_booking\model\TotpRecoveryToken.java
 D:\movie_booking\src\main\java\com\movie_booking\model\User.java

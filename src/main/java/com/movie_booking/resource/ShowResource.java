@@ -156,6 +156,7 @@ public class ShowResource {
         response.setMovieId(show.getMovieId());
         response.setScreenId(show.getScreenId());
         response.setStartTime(show.getStartTime());
+        response.setShowDate(show.getShowDate()); 
         response.setEndTime(show.getEndTime());
         response.setStatus(show.getStatus());
         return response;

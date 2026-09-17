@@ -21,15 +21,27 @@
 
       <div class="booking-summary-card">
         <div class="summary-row">
-          <span class="muted">Booking ID</span>
+          <span class="muted">Movie</span>
+          <strong id="booking-movie">Loading...</strong>
+        </div>
+        <div class="summary-row">
+          <span class="muted">Show &amp; Screen</span>
+          <span id="booking-show-details" style="font-weight: 600; text-align: right;">Loading...</span>
+        </div>
+        <div class="summary-row">
+          <span class="muted">Selected Seats</span>
+          <strong id="booking-seats" class="ticket-seats-highlight" style="color: var(--teal-dark); font-size: 1.05rem;">Loading...</strong>
+        </div>
+        <div class="summary-row">
+          <span class="muted">Booking Reference</span>
           <strong id="booking-id">Loading...</strong>
         </div>
         <div class="summary-row">
           <span class="muted">Total Payable</span>
           <strong class="price-highlight">₹<span id="booking-amount">0.00</span></strong>
         </div>
-        <div class="summary-row timer-row">
-          <span class="muted">Time remaining</span>
+        <div class="summary-row timer-row" style="margin-top: 6px; padding-top: 10px; border-top: 1px dashed var(--line);">
+          <span class="muted">Time remaining to pay</span>
           <span id="countdown" class="countdown-badge">02:00</span>
         </div>
       </div>

@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.movie_booking.model.Booking;
 import com.movie_booking.model.BookingStatus;
+import com.movie_booking.model.TicketStatus;
 
 public interface BookingDao {
     int createBooking(Booking booking) throws SQLException;
@@ -47,6 +48,13 @@ public interface BookingDao {
     int countByShowId(int showId) throws SQLException;
 
     boolean confirmBooking(Connection connection, int bookingId) throws SQLException;
+
+        boolean assignTicketDetails(
+            Connection connection,
+            int bookingId,
+            String ticketCode,
+            TicketStatus ticketStatus
+        ) throws SQLException;
 
     int cancelExpiredBookings(Connection connection) throws SQLException;
 

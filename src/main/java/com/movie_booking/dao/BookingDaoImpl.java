@@ -12,10 +12,12 @@ import java.util.List;
 
 import com.movie_booking.model.Booking;
 import com.movie_booking.model.BookingStatus;
+import com.movie_booking.model.TicketStatus;
 import com.movie_booking.util.DBConnection;
 
 public class BookingDaoImpl implements BookingDao {
-    private static final String BASE_SELECT =  "SELECT booking_id, user_id, show_id, total_amount, status, booked_at, hold_until " +
+    private static final String BASE_SELECT =  "SELECT booking_id, user_id, show_id, total_amount, status, booked_at, hold_until, "
+        + "ticket_code, ticket_status " +
         "FROM bookings";
     private static final String ORDER_BY_BOOKED_AT = " ORDER BY booked_at DESC";
 
@@ -171,6 +173,35 @@ public class BookingDaoImpl implements BookingDao {
     }
 
     @Override
+    public boolean assignTicketDetails(
+            Connection connection,
+            int bookingId,
+            String ticketCode,
+            TicketStatus ticketStatus
+    ) throws SQLException {
+        if (ticketCode == null || ticketCode.trim().isEmpty()) {
+            throw new IllegalArgumentException("Ticket code is required.");
+        }
+        if (ticketStatus == null) {
+            throw new IllegalArgumentException("Ticket status is required.");
+        }
+
+        String sql = "UPDATE bookings "
+                + "SET ticket_code = ?, ticket_status = ? "
+                + "WHERE booking_id = ? "
+                + "AND status = ? "
+                + "AND ticket_code IS NULL";
+
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, ticketCode);
+            statement.setString(2, ticketStatus.name());
+            statement.setInt(3, bookingId);
+            statement.setString(4, BookingStatus.CONFIRMED.name());
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    @Override
     public boolean cancelBooking(int bookingId) throws SQLException {
         return updateStatus(bookingId, BookingStatus.CANCELLED);
     }
@@ -257,6 +288,11 @@ public class BookingDaoImpl implements BookingDao {
         booking.setShowId(resultSet.getInt("show_id"));
         booking.setTotalAmount(resultSet.getBigDecimal("total_amount"));
         booking.setStatus(BookingStatus.valueOf(resultSet.getString("status")));
+        booking.setTicketCode(resultSet.getString("ticket_code"));
+        String ticketStatus = resultSet.getString("ticket_status");
+        if (ticketStatus != null) {
+            booking.setTicketStatus(TicketStatus.valueOf(ticketStatus));
+        }
         booking.setBookedAt(bookedAt == null ? null : bookedAt.toLocalDateTime());
         Timestamp holdUntil = resultSet.getTimestamp("hold_until");
         if (holdUntil != null) {

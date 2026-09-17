@@ -117,6 +117,9 @@ small { color: var(--muted); font-weight: 400; }
 
 /* Ticket Presentation */
 .ticket-container { max-width: 650px; margin: 0 auto; }
+.ticket-qr-section { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 24px 0; padding-top: 20px; border-top: 1px dashed var(--line); }
+.ticket-qr { display: flex; justify-content: center; min-height: 180px; min-width: 180px; }
+.ticket-qr-caption { font-size: .85rem; text-align: center; }
 .ticket-card { background: var(--white); border: 1px solid var(--line); box-shadow: 0 16px 36px rgba(29, 42, 53, .1); border-radius: 6px; overflow: hidden; margin-bottom: 24px; position: relative; }
 .ticket-top { background: linear-gradient(135deg, var(--teal-dark) 0%, var(--teal) 100%); color: var(--white); padding: 24px 28px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .ticket-brand { font: 700 1.2rem 'Trebuchet MS', sans-serif; letter-spacing: .06em; opacity: 0.9; }
@@ -602,4 +605,4 @@ small { color: var(--muted); font-weight: 400; }
   border-radius: 3px;
   font: 700 0.75rem 'Trebuchet MS', sans-serif;
   letter-spacing: .03em;
-}
+}

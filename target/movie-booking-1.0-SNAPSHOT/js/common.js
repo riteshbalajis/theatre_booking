@@ -22,9 +22,25 @@ function formatDate(value) {
     const d = parseDateTime(value);
     return d ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d) : 'Date unavailable';
   }
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`));
+  const str = String(value).trim();
+  const d = str.includes('T') ? new Date(str) : new Date(`${str}T00:00:00`);
+  return isNaN(d.getTime()) ? 'Date unavailable' : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d);
 }
-function formatTime(value) { return value ? value.slice(0, 5) : 'Time unavailable'; }
+
+function formatTime(value) {
+  if (!value) return 'Time unavailable';
+  if (Array.isArray(value)) {
+    const hour = String(value[0] ?? 0).padStart(2, '0');
+    const minute = String(value[1] ?? 0).padStart(2, '0');
+    return `${hour}:${minute}`;
+  }
+  const str = String(value).trim();
+  if (str.includes(',')) {
+    const parts = str.split(',').map(p => p.trim());
+    return `${parts[0].padStart(2, '0')}:${(parts[1] || '00').padStart(2, '0')}`;
+  }
+  return str.length >= 5 ? str.slice(0, 5) : str;
+}
 function todayIso() { return new Date().toISOString().slice(0, 10); }
 function setMessage(element, text, type = '') { if (element) { element.textContent = text || ''; element.className = `message ${type}`.trim(); } }
 function getSavedUser() { try { return JSON.parse(sessionStorage.getItem('screenlyUser') || 'null'); } catch (error) { return null; } }

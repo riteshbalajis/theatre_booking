@@ -10,6 +10,8 @@ public class Booking {
     private BigDecimal totalAmount;
     private BookingStatus status;
     private LocalDateTime bookedAt;
+    private String ticketCode;
+    private TicketStatus ticketStatus;
     private LocalDateTime holdUntil;
 
     public Booking() {
@@ -46,6 +48,10 @@ public class Booking {
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public BookingStatus getStatus() { return status; }
     public void setStatus(BookingStatus status) { this.status = status; }
+    public String getTicketCode() { return ticketCode; }
+    public void setTicketCode(String ticketCode) { this.ticketCode = ticketCode; }
+    public TicketStatus getTicketStatus() { return ticketStatus; }
+    public void setTicketStatus(TicketStatus ticketStatus) { this.ticketStatus = ticketStatus; }
     public LocalDateTime getBookedAt() { return bookedAt; }
     public void setBookedAt(LocalDateTime bookedAt) { this.bookedAt = bookedAt; }
 

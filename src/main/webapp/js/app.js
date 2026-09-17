@@ -900,7 +900,10 @@ async function setupPayment() {
   if (!requireLogin()) return;
 
   const params = new URLSearchParams(window.location.search);
-  const bookingId = params.get('bookingId') || params.get('id') || params.get('booking_id');
+  let bookingId = params.get('bookingId') || params.get('id') || params.get('booking_id');
+  if (bookingId === 'undefined' || bookingId === 'null') {
+    bookingId = null;
+  }
 
   const bookingIdElement = qs('#booking-id');
   const amountElement = qs('#booking-amount');
@@ -910,7 +913,7 @@ async function setupPayment() {
   const message = qs('#payment-message');
 
   if (!bookingId) {
-    setMessage(message, 'Booking ID is required.', 'error');
+    setMessage(message, 'Booking reference is required. Please select your seats again.', 'error');
     if (payButton) payButton.disabled = true;
     if (cancelButton) cancelButton.disabled = true;
     return;
@@ -958,10 +961,44 @@ async function setupPayment() {
   }
 
   try {
-    const booking = await API.get(`/api/bookings/${bookingId}`);
+    const { booking, show, movie, screen } = await fetchFullBookingDetails(bookingId);
+
+    if (!booking) {
+      throw new Error('Booking could not be loaded.');
+    }
 
     if (bookingIdElement) bookingIdElement.textContent = `#${booking.bookingId}`;
     if (amountElement) amountElement.textContent = formatMoney(booking.totalAmount);
+
+    const movieElement = qs('#booking-movie');
+    if (movieElement) {
+      movieElement.textContent = movie ? movie.title : (show ? `Show #${show.showId}` : 'Movie');
+    }
+
+    const showDetailsElement = qs('#booking-show-details');
+    if (showDetailsElement) {
+      if (show) {
+        const screenName = screen ? screen.name : `Screen ${show.screenId}`;
+        const dateStr = formatDate(show.showDate);
+        const timeStr = `${formatTime(show.startTime)} - ${formatTime(show.endTime)}`;
+        showDetailsElement.textContent = `${screenName} · ${dateStr} · ${timeStr}`;
+      } else {
+        showDetailsElement.textContent = 'Show details unavailable';
+      }
+    }
+
+    const seatsElement = qs('#booking-seats');
+    if (seatsElement) {
+      let seatText = '';
+      if (Array.isArray(booking.seats) && booking.seats.length > 0) {
+        seatText = booking.seats.map(s => {
+          const row = s.rowLabel || '';
+          const num = s.seatNumber || '';
+          return (row || num) ? `${row}${num}` : `Seat #${s.showSeatId || ''}`;
+        }).join(', ');
+      }
+      seatsElement.textContent = seatText || 'No seats recorded';
+    }
 
     if (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') {
       setMessage(message, 'This booking has already been confirmed. Opening ticket...', 'success');
@@ -983,10 +1020,11 @@ async function setupPayment() {
     // Determine 2-minute deadline
     const savedDeadline = sessionStorage.getItem(`booking_hold_${bookingId}`);
     let holdDeadline;
-    if (savedDeadline && !isNaN(Number(savedDeadline))) {
+    if (savedDeadline && !isNaN(Number(savedDeadline)) && Number(savedDeadline) > Date.now() - 3600000) {
       holdDeadline = Number(savedDeadline);
     } else if (booking.holdUntil) {
-      holdDeadline = new Date(booking.holdUntil).getTime();
+      const parsed = parseDateTime(booking.holdUntil);
+      holdDeadline = parsed ? parsed.getTime() : (Date.now() + 2 * 60 * 1000);
     } else {
       holdDeadline = Date.now() + 2 * 60 * 1000;
     }
@@ -1010,6 +1048,10 @@ async function setupPayment() {
         setMessage(message, 'Payment time has expired. Please select your seats again.', 'error');
         return;
       }
+      if (typeof Razorpay === 'undefined') {
+        setMessage(message, 'Payment gateway is loading. Please try again in a moment.', 'error');
+        return;
+      }
       setMessage(message, 'Preparing secure Razorpay checkout...');
       if (payButton) payButton.disabled = true;
 
@@ -1029,7 +1071,7 @@ async function setupPayment() {
             console.log('Razorpay payment successful:', response);
             setMessage(message, 'Payment verified! Opening your ticket...', 'success');
             try {
-              await API.post(
+              const verification = await API.post(
                 `/api/bookings/${bookingId}/razorpay_verify`,
                 {
                   razorpayPaymentId: response.razorpay_payment_id,
@@ -1037,13 +1079,14 @@ async function setupPayment() {
                   razorpaySignature: response.razorpay_signature
                 }
               );
+              const verifiedBookingId = verification.bookingId;
 
               paymentCompleted = true;
               sessionStorage.removeItem(`booking_hold_${bookingId}`);
               setMessage(message, 'Payment verified successfully! Opening your ticket...', 'success');
 
               setTimeout(() => {
-                window.location.href = `booking.html?bookingId=${bookingId}`;
+                window.location.href = `booking.html?bookingId=${verifiedBookingId}`;
               }, 1000);
             } catch (error) {
               console.error('Razorpay verification failed:', error);
@@ -1054,8 +1097,11 @@ async function setupPayment() {
           modal: {
             ondismiss: function () {
               if (paymentCompleted) return;
-              console.log('Razorpay Checkout closed/cancelled by user.');
-              handleCancelPayment();
+              console.log('Razorpay Checkout closed by user.');
+              setMessage(message, 'Payment window closed. Click "Pay with Razorpay" when ready to proceed before the timer runs out.', 'error');
+              if (payButton && !timerExpired) {
+                payButton.disabled = false;
+              }
             }
           }
         };
@@ -1073,7 +1119,6 @@ async function setupPayment() {
       } catch (error) {
         console.error('Error starting Razorpay:', error);
         setMessage(message, error.message || 'Unable to open Razorpay payment gateway.', 'error');
-      } finally {
         if (!timerExpired && !paymentCompleted && payButton) payButton.disabled = false;
       }
     }
@@ -1081,9 +1126,6 @@ async function setupPayment() {
     if (payButton) {
       payButton.addEventListener('click', launchRazorpay);
     }
-
-    // Automatically open Razorpay checkout
-    launchRazorpay();
 
   } catch (error) {
     setMessage(message, error.message, 'error');
@@ -1299,9 +1341,15 @@ async function loadSeats() {
     setMessage(message, 'Confirming booking...');
     try {
       const result = await API.post('/api/bookings', { showId: Number(showId), showSeatIds: [...selected.keys()] });
-      const holdTime = result.holdUntil ? new Date(result.holdUntil).getTime() : (Date.now() + 2 * 60 * 1000);
-      sessionStorage.setItem(`booking_hold_${result.bookingId}`, String(holdTime));
-      window.location.href = `payment.html?bookingId=${result.bookingId}`;
+      const bookingId = result && (result.bookingId ?? result.bookingId ?? result.booking_id ?? result.id);
+      const parsedHold = result && result.holdUntil ? parseDateTime(result.holdUntil) : null;
+      const holdTime = parsedHold ? parsedHold.getTime() : (Date.now() + 2 * 60 * 1000);
+      if (bookingId) {
+        sessionStorage.setItem(`booking_hold_${bookingId}`, String(holdTime));
+        window.location.href = `payment.html?bookingId=${bookingId}`;
+      } else {
+        throw new Error('Booking created but reference ID is missing.');
+      }
     }
     catch (error) {
       button.disabled = false; setMessage(message, error.message, 'error');
@@ -1351,9 +1399,14 @@ function renderTicketCard(booking, show, movie, screen) {
         </div>
         <div class="ticket-field">
           <span class="ticket-field-label">Booked At</span>
-          <span class="ticket-field-value">${booking.bookedAt ? new Date(booking.bookedAt).toLocaleDateString() : 'Today'}</span>
+          <span class="ticket-field-value">${booking.bookedAt ? (parseDateTime(booking.bookedAt) ? parseDateTime(booking.bookedAt).toLocaleDateString() : new Date(booking.bookedAt).toLocaleDateString()) : 'Today'}</span>
         </div>
       </div>
+      ${booking.ticketCode && booking.ticketStatus === 'VALID' ? `
+      <div class="ticket-qr-section">
+        <div id="ticket-qr-${booking.bookingId}" class="ticket-qr"></div>
+        <span class="muted ticket-qr-caption">Scan this code at the cinema entrance.</span>
+      </div>` : ''}
       <div class="ticket-footer">
         <span class="muted" style="font-size: .85rem;">Present this confirmed ticket at the cinema entrance.</span>
         <div class="ticket-actions">
@@ -1363,6 +1416,19 @@ function renderTicketCard(booking, show, movie, screen) {
       </div>
     </div>
   </article>`;
+}
+
+function renderTicketQr(booking) {
+  if (!booking || !booking.ticketCode || booking.ticketStatus !== 'VALID'
+      || !window.ScreenlyQR) {
+    return;
+  }
+
+  ScreenlyQR.render(
+    `#ticket-qr-${booking.bookingId}`,
+    booking.ticketCode,
+    180
+  );
 }
 
 async function fetchFullBookingDetails(bookingId) {
@@ -1402,6 +1468,8 @@ async function loadBookings() {
       try {
         const full = await fetchFullBookingDetails(bookedId);
         ticketHtml = `<div class="ticket-container">${renderTicketCard(full.booking, full.show, full.movie, full.screen)}</div><hr style="margin: 30px 0; border: 0; border-top: 1px solid var(--line);">`;
+        list.innerHTML = ticketHtml;
+        renderTicketQr(full.booking);
       } catch (err) {
         // Continue if detail load fails
       }
@@ -1415,7 +1483,7 @@ async function loadBookings() {
     const cardsHtml = bookings.map(booking => `<article class="booking-card"><div>
         <h3>Booking #${booking.bookingId}</h3>
         <p>Show #${booking.showId} &middot; ${(booking.seats || []).map(seat => `${escapeHtml(seat.rowLabel || '')}${seat.seatNumber}`).join(', ')}</p>
-        <p>Booked ${booking.bookedAt ? new Date(booking.bookedAt).toLocaleString() : 'recently'}</p></div>
+        <p>Booked ${booking.bookedAt ? (parseDateTime(booking.bookedAt) ? parseDateTime(booking.bookedAt).toLocaleString() : new Date(booking.bookedAt).toLocaleString()) : 'recently'}</p></div>
         <div><p class="status ${booking.status === 'CANCELLED' ? 'cancelled' : ''}">${escapeHtml(booking.status)}</p>
         <p><strong>₹${formatMoney(booking.totalAmount)}</strong></p>
         <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
@@ -1424,6 +1492,13 @@ async function loadBookings() {
         </div></div></article>`).join('');
 
     list.innerHTML = ticketHtml + cardsHtml;
+    if (bookedId) {
+      const ticket = document.getElementById(`confirmed-ticket-${bookedId}`);
+      if (ticket) {
+        const booking = bookings.find(item => String(item.bookingId) === String(bookedId));
+        if (booking) renderTicketQr(booking);
+      }
+    }
     list.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => cancelBooking(button.dataset.cancel)));
   } catch (error) { setMessage(message, error.message, 'error'); }
 }
@@ -1444,6 +1519,7 @@ async function loadTicketView() {
   try {
     const full = await fetchFullBookingDetails(bookingId);
     container.innerHTML = renderTicketCard(full.booking, full.show, full.movie, full.screen);
+    renderTicketQr(full.booking);
     setMessage(message, `🎉 Booking #${bookingId} confirmed successfully! Here is your ticket.`, 'success');
   } catch (error) {
     setMessage(message, error.message, 'error');
@@ -1518,7 +1594,8 @@ async function formMarkup(config, item = {}) {
     const value = item[name] ?? '';
     if (type.startsWith('select-')) return `<label>${label}${optionMarkup(type, await adminOptions(type), value)}</label>`;
     if (type === 'textarea') return `<label class="wide">${label}<textarea name="${name}" ${required ? 'required' : ''}>${escapeHtml(value)}</textarea></label>`;
-    return `<label>${label}<input name="${name}" type="${type}" value="${escapeHtml(type === 'time' ? String(value).slice(0, 5) : value)}" ${required ? 'required' : ''} ${type === 'number' ? 'min="0" step="0.01"' : ''}></label>`;
+    const timeVal = type === 'time' ? (formatTime(value) === 'Time unavailable' ? '' : formatTime(value)) : value;
+    return `<label>${label}<input name="${name}" type="${type}" value="${escapeHtml(timeVal)}" ${required ? 'required' : ''} ${type === 'number' ? 'min="0" step="0.01"' : ''}></label>`;
   }));
   return fields.join('');
 }
@@ -1526,7 +1603,7 @@ async function formMarkup(config, item = {}) {
 async function renderAdminResource(resource) {
   const config = ADMIN_CONFIG[resource]; const workspace = qs('#admin-workspace'); const message = qs('#page-message');
   workspace.innerHTML = '<p class="muted">Loading resource...</p>';
-  try { const items = resource === 'seats' ? await loadAllSeats() : await API.get(config.endpoint); const rows = items || []; workspace.innerHTML = `<div class="admin-toolbar"><h2>${config.title}</h2><button class="button button-small" data-new-resource>New ${config.title.slice(0, -1)}</button></div><div data-admin-form></div><table class="admin-table"><thead><tr>${config.columns.map(([, label]) => `<th>${label}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr>${config.columns.map(([key]) => `<td>${escapeHtml(item[key])}</td>`).join('')}<td><div class="admin-actions"><button class="button button-small" data-edit="${item[config.id]}">Edit</button><button class="button button-small danger" data-delete="${item[config.id]}">Deactivate</button></div></td></tr>`).join('')}</tbody></table>`; workspace.querySelector('[data-new-resource]').addEventListener('click', () => openAdminForm(resource)); workspace.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openAdminForm(resource, rows.find(item => String(item[config.id]) === button.dataset.edit)))); workspace.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deactivateResource(resource, button.dataset.delete))); setMessage(message, rows.length ? '' : `No ${config.title.toLowerCase()} found.`); } catch (error) { setMessage(message, error.message, 'error'); workspace.innerHTML = ''; }
+  try { const items = resource === 'seats' ? await loadAllSeats() : await API.get(config.endpoint); const rows = items || []; workspace.innerHTML = `<div class="admin-toolbar"><h2>${config.title}</h2><button class="button button-small" data-new-resource>New ${config.title.slice(0, -1)}</button></div><div data-admin-form></div><table class="admin-table"><thead><tr>${config.columns.map(([, label]) => `<th>${label}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr>${config.columns.map(([key]) => { let cellVal = item[key]; if (key === 'startTime' || key === 'endTime') cellVal = formatTime(cellVal); else if (key === 'showDate') cellVal = formatDate(cellVal); return `<td>${escapeHtml(cellVal)}</td>`; }).join('')}<td><div class="admin-actions"><button class="button button-small" data-edit="${item[config.id]}">Edit</button><button class="button button-small danger" data-delete="${item[config.id]}">Deactivate</button></div></td></tr>`).join('')}</tbody></table>`; workspace.querySelector('[data-new-resource]').addEventListener('click', () => openAdminForm(resource)); workspace.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openAdminForm(resource, rows.find(item => String(item[config.id]) === button.dataset.edit)))); workspace.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deactivateResource(resource, button.dataset.delete))); setMessage(message, rows.length ? '' : `No ${config.title.toLowerCase()} found.`); } catch (error) { setMessage(message, error.message, 'error'); workspace.innerHTML = ''; }
 }
 
 async function loadAllSeats() {

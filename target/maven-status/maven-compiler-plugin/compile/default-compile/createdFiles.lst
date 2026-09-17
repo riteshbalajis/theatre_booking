@@ -18,8 +18,10 @@ com\movie_booking\dto\response\BookingCreatedResponse.class
 com\movie_booking\dto\response\ShowResponse.class
 com\movie_booking\resource\ShowSeatResource.class
 com\movie_booking\dto\response\CreateResponse.class
+com\movie_booking\exception\GenericExceptionMapper.class
 com\movie_booking\exception\SQLExceptionMapper.class
 com\movie_booking\model\MovieStatus.class
+com\movie_booking\dto\response\RegistrationResponse.class
 com\movie_booking\dao\MovieDao.class
 com\movie_booking\service\EmailService$1.class
 com\movie_booking\service\BookingAccessException.class
@@ -28,6 +30,7 @@ com\movie_booking\resource\AuthResource.class
 com\movie_booking\dto\request\RazorpayPaymentRequest.class
 com\movie_booking\dao\BookingSeatDao.class
 com\movie_booking\dto\response\TheatreCreateResponse.class
+com\movie_booking\exception\IllegalArgumentExceptionMapper.class
 com\movie_booking\model\SeatStatus.class
 com\movie_booking\dao\BookingDaoImpl.class
 com\movie_booking\service\TheatreServiceImpl.class
@@ -50,7 +53,9 @@ com\movie_booking\model\SeatType.class
 com\movie_booking\dao\TheatreDaoImpl.class
 com\movie_booking\exception\ScreenNotFoundException.class
 com\movie_booking\service\TotpRecoveryServiceImpl.class
+com\movie_booking\model\PendingRegistration.class
 com\movie_booking\service\TotpRecoveryService.class
+com\movie_booking\dto\request\RegistrationVerifyRequest.class
 com\movie_booking\dto\request\ScreenUpdateRequest.class
 com\movie_booking\model\Theatre.class
 com\movie_booking\util\DBConnection.class
@@ -128,7 +133,9 @@ com\movie_booking\dto\request\ScreenCreateRequest.class
 com\movie_booking\resource\ScreenResource.class
 com\movie_booking\dao\ShowSeatDao.class
 com\movie_booking\model\Show.class
+com\movie_booking\dto\response\RazorpayVerificationResponse.class
 com\movie_booking\dao\TotpRecoveryTokenDaoImpl.class
+com\movie_booking\model\TicketStatus.class
 com\movie_booking\model\TotpRecoveryToken.class
 com\movie_booking\exception\TheatreNotFoundException.class
 com\movie_booking\model\BookingStatus.class

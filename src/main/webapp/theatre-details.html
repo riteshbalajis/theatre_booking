@@ -25,9 +25,10 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">Now showing</p>
-          <h2>Shows at this theatre</h2>
+          <h2 id="theatre-shows-heading">Shows at this theatre</h2>
+          <p id="theatre-shows-venue" class="muted">Select a date to view available shows.</p>
         </div>
-        <label class="date-picker">Date<input id="theatre-show-date" type="date"></label>
+        <label class="date-picker">Date<input id="theatre-show-date" type="date" aria-label="Select show date"></label>
       </div>
       <div id="theatre-show-list" class="show-list" aria-live="polite"></div>
       <div id="theatre-show-message" class="message" role="status"></div>

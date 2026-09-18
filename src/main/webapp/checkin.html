@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screenly | Ticket Verification</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-page="checkin">
+  <div id="site-header"></div>
+  <main class="page-shell">
+    <section class="page-heading" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <p class="eyebrow">Cinema Entrance</p>
+        <h1>Verify &amp; Check In Tickets</h1>
+        <p class="muted">Enter or scan the customer's QR ticket code to verify admission and view complete ticket details.</p>
+      </div>
+      <div>
+        <a href="admin.html" class="button button-small button-light">Manage Catalogue &rarr;</a>
+      </div>
+    </section>
+
+    <section class="checkin-panel">
+      <form id="ticket-checkin-form" class="checkin-form">
+        <label for="ticket-checkin-code" class="checkin-label">Customer Ticket Code</label>
+        <div class="checkin-input-group">
+          <input id="ticket-checkin-code" name="ticketCode" type="text"
+            autocomplete="off" placeholder="e.g. SCN-kL91p..." required autofocus>
+          <button id="ticket-checkin-button" class="button" type="submit">Verify &amp; Check In</button>
+          <button id="ticket-checkin-clear" class="button button-light" type="button" style="display: none;">Clear</button>
+        </div>
+      </form>
+      <div id="ticket-checkin-message" class="message" role="status"></div>
+      <div id="ticket-checkin-details" class="ticket-checkin-result" style="display: none;" aria-live="polite"></div>
+    </section>
+  </main>
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

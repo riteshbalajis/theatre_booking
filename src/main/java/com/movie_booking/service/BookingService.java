@@ -16,6 +16,8 @@ public interface BookingService {
 
         Booking getBookingById(int authenticatedUserId, int bookingId) throws SQLException;
 
+        Booking getBookingByReference(int authenticatedUserId, String bookingReference) throws SQLException;
+
         List<BookingSeat> getBookingSeats(int authenticatedUserId, int bookingId)
             throws SQLException;
     
@@ -48,10 +50,11 @@ public interface BookingService {
     void cleanupExpiredBookingsAndHolds();
 
     void confirmPayment(int authenticatedUserId, int bookingId, String pin) throws SQLException;
-    RazorpayOrderResponse createRazorpayOrder(int authenticatedUserId, int bookingId)
+    RazorpayOrderResponse createRazorpayOrder(int authenticatedUserId, String bookingReference)
         throws SQLException;
 
-    public void verifyRazorpayPayment(int authenticatedUserId,int bookingId,RazorpayPaymentRequest request)
+    int verifyRazorpayPayment(int authenticatedUserId, String bookingReference,
+            RazorpayPaymentRequest request)
         throws SQLException;
 
 

@@ -54,6 +54,7 @@ import com.razorpay.RazorpayClient;
 import com.razorpay.Utils;
 
 public class BookingServiceImpl implements BookingService {
+    private static final SecureRandom BOOKING_REFERENCE_RANDOM = new SecureRandom();
     private static final SecureRandom TICKET_CODE_RANDOM = new SecureRandom();
 
     private final BookingDao bookingDao;
@@ -171,6 +172,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.setTotalAmount(totalAmount);
                 booking.setStatus(BookingStatus.PENDING);
                 booking.setHoldUntil(holdUntil);
+                booking.setBookingReference(generateBookingReference());
                 int bookingId = bookingDao.createBooking(connection, booking);
                 for (BookingSeat bookingSeat : bookingSeats) {
                     bookingSeat.setBookingId(bookingId);
@@ -237,6 +239,15 @@ public class BookingServiceImpl implements BookingService {
         requireAuthenticatedUser(authenticatedUserId);
         requirePositiveId(bookingId, "Booking ID");
         Booking booking = bookingDao.findById(bookingId);
+        requireBookingOwner(authenticatedUserId, booking);
+        return booking;
+    }
+
+    @Override
+    public Booking getBookingByReference(int authenticatedUserId, String bookingReference) throws SQLException {
+        requireAuthenticatedUser(authenticatedUserId);
+        requireBookingReference(bookingReference);
+        Booking booking = bookingDao.findByBookingReference(authenticatedUserId, bookingReference);
         requireBookingOwner(authenticatedUserId, booking);
         return booking;
     }
@@ -392,19 +403,17 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public RazorpayOrderResponse createRazorpayOrder(
-            int authenticatedUserId, int bookingId) throws SQLException {
+            int authenticatedUserId, String bookingReference) throws SQLException {
 
         requireCustomerUser(authenticatedUserId);
-        requirePositiveId(bookingId, "Booking ID");
+        requireBookingReference(bookingReference);
 
-        Booking booking = bookingDao.findById(bookingId);
+        Booking booking = bookingDao.findByBookingReference(
+                authenticatedUserId,
+                bookingReference);
 
         if (booking == null) {
             throw new IllegalArgumentException("Booking not found.");
-        }
-
-        if (booking.getUserId() != authenticatedUserId) {
-            throw new IllegalArgumentException("You cannot access this booking.");
         }
 
         if (booking.getStatus() != BookingStatus.PENDING) {
@@ -431,13 +440,21 @@ public class BookingServiceImpl implements BookingService {
 
             orderRequest.put("amount", amountInPaise);
             orderRequest.put("currency", "INR");
-            orderRequest.put("receipt", "booking_" + bookingId);
+                orderRequest.put("receipt", "booking_" + booking.getBookingId());
 
             Order order = razorpayClient.orders.create(orderRequest);
+                String razorpayOrderId = order.get("id");
+
+                if (!bookingDao.updateRazorpayOrderId(
+                    booking.getBookingId(),
+                    authenticatedUserId,
+                    razorpayOrderId)) {
+                throw new SQLException("Unable to store Razorpay order.");
+                }
 
             return new RazorpayOrderResponse(
-                    bookingId,
-                    order.get("id"),
+                    booking.getBookingId(),
+                    razorpayOrderId,
                     RazorpayConfig.getKeyId(),
                     booking.getTotalAmount(),
                     "INR");
@@ -450,11 +467,14 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public void verifyRazorpayPayment(int authenticatedUserId, int bookingId, RazorpayPaymentRequest request)
+    public int verifyRazorpayPayment(
+            int authenticatedUserId,
+            String bookingReference,
+            RazorpayPaymentRequest request)
             throws SQLException {
 
         requireCustomerUser(authenticatedUserId);
-        requirePositiveId(bookingId, "Booking ID");
+        requireBookingReference(bookingReference);
 
         if (request == null) {
             throw new IllegalArgumentException(
@@ -479,21 +499,26 @@ public class BookingServiceImpl implements BookingService {
                     "Razorpay signature is required.");
         }
 
-        Booking booking = bookingDao.findById(bookingId);
+        Booking booking = bookingDao.findByBookingReference(
+            authenticatedUserId,
+            bookingReference);
 
         if (booking == null) {
             throw new IllegalArgumentException("Booking not found.");
         }
 
-        if (booking.getUserId() != authenticatedUserId) {
+        if (booking.getRazorpayOrderId() == null
+            || !booking.getRazorpayOrderId().equals(request.getRazorpayOrderId())) {
             throw new IllegalArgumentException(
-                    "You cannot access this booking.");
+                "Razorpay order does not match this booking.");
         }
 
         if (booking.getStatus() != BookingStatus.PENDING) {
             throw new IllegalStateException(
                     "Booking is not pending payment.");
         }
+
+        int bookingId = booking.getBookingId();
 
         try {
             String payload
@@ -574,6 +599,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         sendTicketConfirmationEmailSafely(bookingId);
+        return booking.getBookingId();
     }
 
     private void assignTicketCode(Connection connection, int bookingId)
@@ -604,6 +630,14 @@ public class BookingServiceImpl implements BookingService {
         byte[] randomBytes = new byte[24];
         TICKET_CODE_RANDOM.nextBytes(randomBytes);
         return "SCN-" + Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(randomBytes);
+    }
+
+    private static String generateBookingReference() {
+        byte[] randomBytes = new byte[12];
+        BOOKING_REFERENCE_RANDOM.nextBytes(randomBytes);
+        return "BK-" + Base64.getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(randomBytes);
     }
@@ -691,6 +725,12 @@ public class BookingServiceImpl implements BookingService {
     private static void requirePositiveId(int id, String fieldName) {
         if (id <= 0) {
             throw new IllegalArgumentException(fieldName + " must be positive.");
+        }
+    }
+
+    private static void requireBookingReference(String bookingReference) {
+        if (bookingReference == null || bookingReference.trim().isEmpty()) {
+            throw new IllegalArgumentException("Booking reference is required.");
         }
     }
 

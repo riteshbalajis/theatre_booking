@@ -16,8 +16,8 @@ import com.movie_booking.model.TicketStatus;
 import com.movie_booking.util.DBConnection;
 
 public class BookingDaoImpl implements BookingDao {
-    private static final String BASE_SELECT =  "SELECT booking_id, user_id, show_id, total_amount, status, booked_at, hold_until, "
-        + "ticket_code, ticket_status " +
+    private static final String BASE_SELECT =  "SELECT booking_id, booking_reference, user_id, show_id, total_amount, status, booked_at, hold_until, "
+        + "ticket_code, ticket_status, order_id " +
         "FROM bookings";
     private static final String ORDER_BY_BOOKED_AT = " ORDER BY booked_at DESC";
 
@@ -30,18 +30,20 @@ public class BookingDaoImpl implements BookingDao {
 
         @Override
         public int createBooking(Connection connection, Booking booking) throws SQLException {
-        String sql = "INSERT INTO bookings (user_id, show_id, total_amount, status, hold_until) " +
-        "VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO bookings "
+            + "(booking_reference, user_id, show_id, total_amount, status, hold_until) "
+            + "VALUES (?, ?, ?, ?, ?, ?)";
 
         try (PreparedStatement statement = connection.prepareStatement(sql,
             Statement.RETURN_GENERATED_KEYS)) {
-            statement.setInt(1, booking.getUserId());
-            statement.setInt(2, booking.getShowId());
-            statement.setBigDecimal(3, booking.getTotalAmount());
-            statement.setString(4, booking.getStatus() == null
+                statement.setString(1, booking.getBookingReference());
+                statement.setInt(2, booking.getUserId());
+                statement.setInt(3, booking.getShowId());
+                statement.setBigDecimal(4, booking.getTotalAmount());
+                statement.setString(5, booking.getStatus() == null
                     ? BookingStatus.PENDING.name() : booking.getStatus().name());
 
-            statement.setTimestamp(5, booking.getHoldUntil() == null ? null : Timestamp.valueOf(booking.getHoldUntil()));
+                statement.setTimestamp(6, booking.getHoldUntil() == null ? null : Timestamp.valueOf(booking.getHoldUntil()));
             statement.executeUpdate();
 
             try (ResultSet keys = statement.getGeneratedKeys()) {
@@ -52,6 +54,38 @@ public class BookingDaoImpl implements BookingDao {
         }
 
         throw new SQLException("Creating booking failed: no ID was generated.");
+    }
+
+    @Override
+    public boolean updateRazorpayOrderId(
+            int bookingId,
+            int userId,
+            String razorpayOrderId) throws SQLException {
+        String sql = "UPDATE bookings SET order_id = ? "
+                + "WHERE booking_id = ? AND user_id = ?";
+        try (Connection connection = DBConnection.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, razorpayOrderId);
+            statement.setInt(2, bookingId);
+            statement.setInt(3, userId);
+            return statement.executeUpdate() == 1;
+        }
+    }
+
+    @Override
+    public Booking findByBookingReference(
+            int userId,
+            String bookingReference) throws SQLException {
+        String sql = BASE_SELECT
+                + " WHERE booking_reference = ? AND user_id = ?";
+        try (Connection connection = DBConnection.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, bookingReference);
+            statement.setInt(2, userId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? mapBooking(resultSet) : null;
+            }
+        }
     }
 
     @Override
@@ -329,6 +363,7 @@ public class BookingDaoImpl implements BookingDao {
         Timestamp bookedAt = resultSet.getTimestamp("booked_at");
         Booking booking = new Booking();
         booking.setBookingId(resultSet.getInt("booking_id"));
+        booking.setBookingReference(resultSet.getString("booking_reference"));
         booking.setUserId(resultSet.getInt("user_id"));
         booking.setShowId(resultSet.getInt("show_id"));
         booking.setTotalAmount(resultSet.getBigDecimal("total_amount"));
@@ -338,6 +373,7 @@ public class BookingDaoImpl implements BookingDao {
         if (ticketStatus != null) {
             booking.setTicketStatus(TicketStatus.valueOf(ticketStatus));
         }
+        booking.setRazorpayOrderId(resultSet.getString("order_id"));
         booking.setBookedAt(bookedAt == null ? null : bookedAt.toLocalDateTime());
         Timestamp holdUntil = resultSet.getTimestamp("hold_until");
         if (holdUntil != null) {

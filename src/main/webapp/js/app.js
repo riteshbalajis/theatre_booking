@@ -1,59 +1,108 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
-    await loadCurrentUser();
+  await loadCurrentUser();
 
-    renderHeader();
+  renderHeader();
 
-    const page = document.body.dataset.page;
+  const page = document.body.dataset.page;
 
-    const handlers = {
-        home: loadHome,
-        movies: loadMoviesPage,
-        theatres: loadTheatresPage,
-        theatre_details: loadTheatreDetails,
-        login: setupLogin,
-        settings: setupSettings,
-        register: setupRegister,
-        forgot_password: setupForgetPassword,
-        forget_password: setupForgetPassword,
-        details: loadDetails,
-        seats: loadSeats,
-        bookings: loadBookings,
-        payment: setupPayment,
-        admin: loadAdmin,
-        ticket_view: loadTicketView
-    };
+  const handlers = {
+    home: loadHome,
+    movies: loadMoviesPage,
+    theatres: loadTheatresPage,
+    theatre_details: loadTheatreDetails,
+    login: setupLogin,
+    settings: setupSettings,
+    register: setupRegister,
+    forgot_password: setupForgetPassword,
+    forget_password: setupForgetPassword,
+    details: loadDetails,
+    seats: loadSeats,
+    bookings: loadBookings,
+    payment: setupPayment,
+    admin: loadAdmin,
+    ticket_view: loadTicketView,
+    checkin: loadTicketCheckin,
+    ticket_checkin: loadTicketCheckin
+  };
 
-    if (handlers[page]) {
-        handlers[page]();
-    }
+  if (handlers[page]) {
+    handlers[page]();
+  }
 });
 
-function movieCard(movie) {
+function movieCard(movie, isUpcoming = false) {
+  const upcoming = isUpcoming || movie.status === 'UPCOMING';
+  const releaseDateStr = movie.releaseDate ? formatDate(movie.releaseDate) : 'Coming Soon';
+
   return `<article class="movie-card">
-  <div class="poster-placeholder">${escapeHtml(movie.title)}</div>
-  <div class="movie-card-body"><h3>${escapeHtml(movie.title)}</h3>
+  <div class="poster-placeholder" style="position: relative; overflow: hidden;">
+    ${escapeHtml(movie.title)}
+    ${upcoming ? '<span class="badge badge-upcoming" style="position: absolute; top: 10px; right: 10px; z-index: 2;">Upcoming</span>' : ''}
+  </div>
+  <div class="movie-card-body">
+    <h3>${escapeHtml(movie.title)}</h3>
   
-  <p class="movie-meta">
-  ${escapeHtml(movie.genre || 'Feature')} &middot; 
-  ${escapeHtml(movie.language || 'Original')} &middot; 
-  ${movie.durationMinutes || 0} min</p>
+    <p class="movie-meta">
+      ${escapeHtml(movie.genre || 'Feature')} &middot; 
+      ${escapeHtml(movie.language || 'Original')} &middot; 
+      ${movie.durationMinutes || 0} min
+    </p>
+
+    ${upcoming ? `<p class="upcoming-release-date">🗓️ Releases: ${escapeHtml(releaseDateStr)}</p>` : ''}
   
-  ${movie.description ? `<p class="movie-description">${escapeHtml(movie.description)}</p>` : ''}
+    ${movie.description ? `<p class="movie-description">${escapeHtml(movie.description)}</p>` : ''}
   
-  <a class="button button-small" href="movie-details.html?id=${movie.movieId}">View shows</a>
+    <div style="margin-top: auto; padding-top: 10px;">
+      ${upcoming
+        ? `<a class="button button-small button-light" href="movie-details.html?id=${movie.movieId}">View details</a>`
+        : `<a class="button button-small" href="movie-details.html?id=${movie.movieId}">View shows</a>`
+      }
+    </div>
   </div>
   </article>`;
 }
 
-async function getActiveMovies(keyword = '') {
+async function getAllMoviesCategorized(keyword = '') {
   const path = keyword ? `/api/movies?keyword=${encodeURIComponent(keyword)}` : '/api/movies';
-  const movies = await API.get(path);
-  return (movies || []).filter(movie => movie.status === 'ACTIVE');
+  const movies = await API.get(path) || [];
+  
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const activeMovies = [];
+  const upcomingMovies = [];
+
+  movies.forEach(movie => {
+    const isExplicitUpcoming = movie.status === 'UPCOMING';
+    let isFutureRelease = false;
+    if (movie.releaseDate) {
+      const relDate = new Date(movie.releaseDate);
+      if (!isNaN(relDate.getTime()) && relDate > now) {
+        isFutureRelease = true;
+      }
+    }
+
+    if (movie.status === 'ACTIVE' && !isFutureRelease) {
+      activeMovies.push(movie);
+    } else if (isExplicitUpcoming || isFutureRelease) {
+      upcomingMovies.push(movie);
+    } else if (movie.status === 'ACTIVE') {
+      activeMovies.push(movie);
+    }
+  });
+
+  return { activeMovies, upcomingMovies, allMovies: movies };
+}
+
+async function getActiveMovies(keyword = '') {
+  const { activeMovies } = await getAllMoviesCategorized(keyword);
+  return activeMovies;
 }
 
 async function loadHome() {
   const list = qs('#movie-list');
+  const upcomingList = qs('#upcoming-movie-list');
   const message = qs('#page-message');
 
   const params = new URLSearchParams(window.location.search);
@@ -64,33 +113,54 @@ async function loadHome() {
   }
 
   try {
-    const movies = await getActiveMovies();
-    list.innerHTML = movies.length ? movies.map(movieCard).join('') : '<p class="muted">No active movies are available right now.</p>';
+    const { activeMovies, upcomingMovies } = await getAllMoviesCategorized();
+    if (list) {
+      list.innerHTML = activeMovies.length
+        ? activeMovies.map(m => movieCard(m, false)).join('')
+        : '<p class="muted">No active movies are available right now.</p>';
+    }
+    if (upcomingList) {
+      upcomingList.innerHTML = upcomingMovies.length
+        ? upcomingMovies.map(m => movieCard(m, true)).join('')
+        : '<p class="muted">Exciting new releases coming soon! Stay tuned.</p>';
+    }
   }
   catch (error) { setMessage(message, error.message, 'error'); }
 }
 
 async function loadMoviesPage() {
-
   const list = qs('#movie-list');
+  const upcomingList = qs('#upcoming-movie-list');
   const message = qs('#page-message');
   const form = qs('#movie-search');
+
   const render = async keyword => {
     setMessage(message, 'Loading movies...');
     try {
-      const movies = await getActiveMovies(keyword);
-      list.innerHTML = movies.length ? movies.map(movieCard).join('') : '<p class="muted">No active movies match your search.</p>';
+      const { activeMovies, upcomingMovies } = await getAllMoviesCategorized(keyword);
+      if (list) {
+        list.innerHTML = activeMovies.length
+          ? activeMovies.map(m => movieCard(m, false)).join('')
+          : '<p class="muted">No active movies match your search.</p>';
+      }
+      if (upcomingList) {
+        upcomingList.innerHTML = upcomingMovies.length
+          ? upcomingMovies.map(m => movieCard(m, true)).join('')
+          : '<p class="muted">No upcoming movies match your search.</p>';
+      }
       setMessage(message, '');
     }
     catch (error) {
       setMessage(message, error.message, 'error');
     }
   };
-  form.addEventListener('submit', event => {
-    event.preventDefault();
-    render(new FormData(form).get('keyword').trim());
+
+  if (form) {
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      render(new FormData(form).get('keyword').trim());
+    });
   }
-  );
   render('');
 }
 
@@ -155,6 +225,7 @@ async function loadTheatreDetails() {
   const showDateInput = qs('#theatre-show-date');
   const showList = qs('#theatre-show-list');
   const showMessage = qs('#theatre-show-message');
+  const showsVenue = qs('#theatre-shows-venue');
 
   if (!id) {
     setMessage(message, 'A theatre ID is required.', 'error');
@@ -180,7 +251,6 @@ async function loadTheatreDetails() {
         </p>
         <p class="movie-meta theatre-meta-details">
           <span><strong>Status:</strong> <span class="status-badge ${theatre.status === 'ACTIVE' ? 'badge-active' : 'badge-inactive'}">${escapeHtml(theatre.status || 'ACTIVE')}</span></span> &middot;
-          <span><strong>Theatre ID:</strong> #${theatre.theatreId}</span> &middot;
           <span><strong>Registered:</strong> ${escapeHtml(createdDateStr)}</span>
         </p>
         <div class="theatre-quick-actions" style="margin-top: 20px;">
@@ -188,6 +258,9 @@ async function loadTheatreDetails() {
         </div>
       </div>
     `;
+    if (showsVenue) {
+      showsVenue.textContent = `${theatre.name}${theatre.location ? ` · ${theatre.location}` : ''}`;
+    }
 
     try {
       const allScreens = await API.get('/api/screens');
@@ -199,7 +272,6 @@ async function loadTheatreDetails() {
             <span class="eyebrow">${escapeHtml(screen.status || 'ACTIVE')}</span>
             <strong class="show-time screen-name-display">${escapeHtml(screen.name)}</strong>
             <small>Capacity: ${screen.capacity} seats</small>
-            <span class="screen-badge">Screen #${screen.screenId}</span>
           </article>
         `).join('');
       } else {
@@ -210,9 +282,15 @@ async function loadTheatreDetails() {
     }
 
     if (showDateInput && showList) {
-      showDateInput.value = todayIso();
+      showDateInput.value = '';
+      showList.innerHTML = '<p class="muted">Select a date to view shows at this theatre.</p>';
 
       const loadTheatreShows = async () => {
+        if (!showDateInput.value) {
+          showList.innerHTML = '<p class="muted">Select a date to view shows at this theatre.</p>';
+          setMessage(showMessage, '');
+          return;
+        }
         setMessage(showMessage, 'Loading showtimes...');
         showList.innerHTML = '';
         try {
@@ -238,8 +316,8 @@ async function loadTheatreDetails() {
               <div class="show-slots-grid">
                 ${shows.map(show => `
                   <a class="show-slot-box" href="seats.html?showId=${show.showId}"
-                     title="${escapeHtml(show.screenName || 'Screen ' + show.screenId)}: ${formatTime(show.startTime)} - ${formatTime(show.endTime)}">
-                    <span class="slot-screen">${escapeHtml(show.screenName || 'Screen ' + show.screenId)}</span>
+                     title="${escapeHtml(show.screenName || 'Screen')}: ${formatTime(show.startTime)} - ${formatTime(show.endTime)}">
+                    <span class="slot-screen">${escapeHtml(show.screenName || 'Screen')}</span>
                     <strong class="slot-time">${formatTime(show.startTime)}</strong>
                     <span class="slot-action">${show.regularPrice ? 'From ₹' + show.regularPrice : 'Select Seats'}</span>
                   </a>
@@ -253,7 +331,6 @@ async function loadTheatreDetails() {
       };
 
       showDateInput.addEventListener('change', loadTheatreShows);
-      loadTheatreShows();
     }
 
     setMessage(message, '');
@@ -263,504 +340,564 @@ async function loadTheatreDetails() {
 }
 
 function setupLogin() {
-    const loginSection = qs('#login-section');
-    const form = qs('#login-form');
-    const message = qs('#form-message');
+  const loginSection = qs('#login-section');
+  const form = qs('#login-form');
+  const message = qs('#form-message');
 
-    const totpSection = qs('#totp-section');
-    const totpForm = qs('#totp-form');
-    const totpCode = qs('#totp-code');
-    const totpMessage = qs('#totp-message');
-    const totpButton = qs('#totp-verify-button');
-    const totpBackButton = qs('#totp-back-button');
-    const recoveryActions = qs('#totp-recovery-actions');
-    const recoveryEmailButton = qs('#totp-recovery-email-button');
-    const recoveryPanel = qs('#totp-email-recovery');
-    const recoverySendButton = qs('#totp-send-recovery-button');
-    const recoveryForm = qs('#totp-recovery-form');
-    const recoveryCode = qs('#totp-recovery-code');
-    const recoveryVerifyButton = qs('#totp-recovery-verify-button');
-    const recoverySetup = qs('#totp-recovery-setup');
-    const recoverySecret = qs('#totp-recovery-secret');
-    const recoverySetupForm = qs('#totp-recovery-setup-form');
-    const recoverySetupCode = qs('#totp-recovery-setup-code');
-    const recoverySetupButton = qs('#totp-recovery-setup-button');
+  const totpSection = qs('#totp-section');
+  const totpForm = qs('#totp-form');
+  const totpCode = qs('#totp-code');
+  const totpMessage = qs('#totp-message');
+  const totpButton = qs('#totp-verify-button');
+  const totpBackButton = qs('#totp-back-button');
+  const recoveryActions = qs('#totp-recovery-actions');
+  const recoveryEmailButton = qs('#totp-recovery-email-button');
+  const recoveryPanel = qs('#totp-email-recovery');
+  const recoverySendButton = qs('#totp-send-recovery-button');
+  const recoveryForm = qs('#totp-recovery-form');
+  const recoveryCode = qs('#totp-recovery-code');
+  const recoveryVerifyButton = qs('#totp-recovery-verify-button');
+  const recoverySetup = qs('#totp-recovery-setup');
+  const recoverySecret = qs('#totp-recovery-secret');
+  const recoverySetupForm = qs('#totp-recovery-setup-form');
+  const recoverySetupCode = qs('#totp-recovery-setup-code');
+  const recoverySetupButton = qs('#totp-recovery-setup-button');
 
-    const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.search);
 
-    if (params.get('reset') === 'success') {
-        setMessage(
-            message,
-            'Password reset successfully! Please log in with your new password.',
+  if (params.get('reset') === 'success') {
+    setMessage(
+      message,
+      'Password reset successfully! Please log in with your new password.',
+      'success'
+    );
+  } else if (params.get('registered') === '1') {
+    setMessage(
+      message,
+      'Registration successful! Please log in.',
+      'success'
+    );
+  }
+
+  /*
+   * STEP 1: Email + Password login
+   */
+  if (form) {
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      setMessage(message, 'Signing in...');
+
+      const data = Object.fromEntries(new FormData(form));
+
+      try {
+        const result = await API.post('/api/auth/login', data);
+
+        /*
+         * Case A: TOTP is enabled on this account.
+         * Password is valid, but TOTP verification is required.
+         */
+        if (result.totpRequired) {
+          setMessage(message, '');
+          if (loginSection) loginSection.style.display = 'none';
+          if (totpSection) totpSection.style.display = 'block';
+
+          setMessage(
+            totpMessage,
+            'Password verified. Enter your 6-digit authenticator code.',
             'success'
-        );
-    } else if (params.get('registered') === '1') {
-        setMessage(
-            message,
-            'Registration successful! Please log in.',
-            'success'
-        );
-    }
+          );
 
-    /*
-     * STEP 1: Email + Password login
-     */
-    if (form) {
-        form.addEventListener('submit', async event => {
-            event.preventDefault();
-            setMessage(message, 'Signing in...');
-
-            const data = Object.fromEntries(new FormData(form));
-
-            try {
-                const result = await API.post('/api/auth/login', data);
-
-                /*
-                 * Case A: TOTP is enabled on this account.
-                 * Password is valid, but TOTP verification is required.
-                 */
-                if (result.totpRequired) {
-                    setMessage(message, '');
-                    if (loginSection) loginSection.style.display = 'none';
-                    if (totpSection) totpSection.style.display = 'block';
-
-                    setMessage(
-                        totpMessage,
-                        'Password verified. Enter your 6-digit authenticator code.',
-                        'success'
-                    );
-
-                    if (totpCode) {
-                        totpCode.value = '';
-                        totpCode.focus();
-                    }
-                    return;
-                }
-
-                /*
-                 * Case B: TOTP is NOT enabled.
-                 * Login is completely successful.
-                 */
-                currentUser = result.user;
-                saveUser(result.user);
-                if (result.user && result.user.userId) {
-                    setTotpStatus(result.user.userId, 'DISABLED');
-                }
-
-                window.location.href = result.user && result.user.role === 'ADMIN'
-                    ? 'admin.html'
-                    : 'index.html';
-
-            } catch (error) {
-                setMessage(message, error.message, 'error');
-            }
-        });
-    }
-
-    /*
-     * STEP 2: TOTP Verification
-     */
-    if (totpForm) {
-        totpForm.addEventListener('submit', async event => {
-            event.preventDefault();
-            const code = totpCode ? totpCode.value.trim() : '';
-
-            if (!/^\d{6}$/.test(code)) {
-                setMessage(totpMessage, 'Enter a valid 6-digit numeric code.', 'error');
-                return;
-            }
-
-            if (totpButton) totpButton.disabled = true;
-            setMessage(totpMessage, 'Verifying authenticator code...');
-
-            try {
-                await API.post('/api/totp/login/verify', { code: code });
-
-                // Promoted to authenticated session
-                const user = await loadCurrentUser();
-                if (user && user.userId) {
-                    setTotpStatus(user.userId, 'ENABLED');
-                    saveUser(user);
-                }
-
-                window.location.href = user && user.role === 'ADMIN'
-                    ? 'admin.html'
-                    : 'index.html';
-
-            } catch (error) {
-                setMessage(totpMessage, error.message || 'Invalid TOTP code.', 'error');
-                if (totpButton) totpButton.disabled = false;
-                if (totpCode) totpCode.focus();
-            }
-        });
-    }
-
-    /*
-     * Back to Login button
-     */
-    if (totpBackButton) {
-        totpBackButton.addEventListener('click', () => {
-            setMessage(totpMessage, '');
-            setMessage(message, '');
-            if (totpSection) totpSection.style.display = 'none';
-            if (loginSection) loginSection.style.display = 'block';
-        });
-    }
-
-        if (recoveryEmailButton) {
-          recoveryEmailButton.addEventListener('click', () => {
-            if (recoveryPanel) recoveryPanel.style.display = 'block';
-            if (recoveryActions) recoveryActions.style.display = 'none';
-            setMessage(totpMessage, 'Choose email recovery to continue.');
-          });
+          if (totpCode) {
+            totpCode.value = '';
+            totpCode.focus();
+          }
+          return;
         }
 
-        if (recoverySendButton) {
-          recoverySendButton.addEventListener('click', async () => {
-            recoverySendButton.disabled = true;
-            setMessage(totpMessage, 'Sending recovery code...');
-            try {
-              await API.post('/api/totp/recovery/email/request');
-              recoverySendButton.style.display = 'none';
-              if (recoveryForm) recoveryForm.style.display = 'block';
-              setMessage(totpMessage, 'Recovery code sent. Check your email.', 'success');
-              if (recoveryCode) recoveryCode.focus();
-            } catch (error) {
-              setMessage(totpMessage, error.message, 'error');
-              recoverySendButton.disabled = false;
-            }
-          });
+        /*
+         * Case B: TOTP is NOT enabled.
+         * Login is completely successful.
+         */
+        currentUser = result.user;
+        saveUser(result.user);
+        if (result.user && result.user.userId) {
+          setTotpStatus(result.user.userId, 'DISABLED');
         }
 
-        if (recoveryForm) {
-          recoveryForm.addEventListener('submit', async event => {
-            event.preventDefault();
-            const code = recoveryCode ? recoveryCode.value.trim() : '';
-            if (!/^\d{6}$/.test(code)) {
-              setMessage(totpMessage, 'Enter a valid 6-digit recovery code.', 'error');
-              return;
-            }
+        window.location.href = result.user && result.user.role === 'ADMIN'
+          ? 'admin.html'
+          : 'index.html';
 
-            if (recoveryVerifyButton) recoveryVerifyButton.disabled = true;
-            setMessage(totpMessage, 'Verifying recovery code...');
-            try {
-              await API.post('/api/totp/recovery/email/verify', { otp: code });
-              const response = await API.post('/api/totp/regenerate');
-              if (recoveryForm) recoveryForm.style.display = 'none';
-              if (recoverySetup) recoverySetup.style.display = 'block';
-              if (recoverySecret) recoverySecret.textContent = response.secret;
-              if (window.ScreenlyQR && response.otpauthUri) {
-                ScreenlyQR.render('#totp-recovery-qr', response.otpauthUri, 180);
-              }
-              setMessage(totpMessage, 'Scan the new QR code and verify it below.', 'success');
-              if (recoverySetupCode) recoverySetupCode.focus();
-            } catch (error) {
-              setMessage(totpMessage, error.message, 'error');
-              if (recoveryVerifyButton) recoveryVerifyButton.disabled = false;
-            }
-          });
+      } catch (error) {
+        setMessage(message, error.message, 'error');
+      }
+    });
+  }
+
+  /*
+   * STEP 2: TOTP Verification
+   */
+  if (totpForm) {
+    totpForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const code = totpCode ? totpCode.value.trim() : '';
+
+      if (!/^\d{6}$/.test(code)) {
+        setMessage(totpMessage, 'Enter a valid 6-digit numeric code.', 'error');
+        return;
+      }
+
+      if (totpButton) totpButton.disabled = true;
+      setMessage(totpMessage, 'Verifying authenticator code...');
+
+      try {
+        await API.post('/api/totp/login/verify', { code: code });
+
+        // Promoted to authenticated session
+        const user = await loadCurrentUser();
+        if (user && user.userId) {
+          setTotpStatus(user.userId, 'ENABLED');
+          saveUser(user);
         }
 
-        if (recoverySetupForm) {
-          recoverySetupForm.addEventListener('submit', async event => {
-            event.preventDefault();
-            const code = recoverySetupCode ? recoverySetupCode.value.trim() : '';
-            if (!/^\d{6}$/.test(code)) {
-              setMessage(totpMessage, 'Enter a valid 6-digit authenticator code.', 'error');
-              return;
-            }
+        window.location.href = user && user.role === 'ADMIN'
+          ? 'admin.html'
+          : 'index.html';
 
-            if (recoverySetupButton) recoverySetupButton.disabled = true;
-            setMessage(totpMessage, 'Activating your new authenticator...');
-            try {
-              await API.post('/api/totp/setup/verify', { code: code });
-              const user = await loadCurrentUser();
-              if (user && user.userId) {
-                saveUser(user);
-                setTotpStatus(user.userId, 'ENABLED');
-              }
-              window.location.href = user && user.role === 'ADMIN'
-                ? 'admin.html'
-                : 'index.html';
-            } catch (error) {
-              setMessage(totpMessage, error.message, 'error');
-              if (recoverySetupButton) recoverySetupButton.disabled = false;
-            }
-          });
+      } catch (error) {
+        setMessage(totpMessage, error.message || 'Invalid TOTP code.', 'error');
+        if (totpButton) totpButton.disabled = false;
+        if (totpCode) totpCode.focus();
+      }
+    });
+  }
+
+  /*
+   * Back to Login button
+   */
+  if (totpBackButton) {
+    totpBackButton.addEventListener('click', () => {
+      setMessage(totpMessage, '');
+      setMessage(message, '');
+      if (totpSection) totpSection.style.display = 'none';
+      if (loginSection) loginSection.style.display = 'block';
+    });
+  }
+
+  if (recoveryEmailButton) {
+    recoveryEmailButton.addEventListener('click', () => {
+      if (recoveryPanel) recoveryPanel.style.display = 'block';
+      if (recoveryActions) recoveryActions.style.display = 'none';
+      setMessage(totpMessage, 'Choose email recovery to continue.');
+    });
+  }
+
+  if (recoverySendButton) {
+    recoverySendButton.addEventListener('click', async () => {
+      recoverySendButton.disabled = true;
+      setMessage(totpMessage, 'Sending recovery code...');
+      try {
+        await API.post('/api/totp/recovery/email/request');
+        recoverySendButton.style.display = 'none';
+        if (recoveryForm) recoveryForm.style.display = 'block';
+        setMessage(totpMessage, 'Recovery code sent. Check your email.', 'success');
+        if (recoveryCode) recoveryCode.focus();
+      } catch (error) {
+        setMessage(totpMessage, error.message, 'error');
+        recoverySendButton.disabled = false;
+      }
+    });
+  }
+
+  if (recoveryForm) {
+    recoveryForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const code = recoveryCode ? recoveryCode.value.trim() : '';
+      if (!/^\d{6}$/.test(code)) {
+        setMessage(totpMessage, 'Enter a valid 6-digit recovery code.', 'error');
+        return;
+      }
+
+      if (recoveryVerifyButton) recoveryVerifyButton.disabled = true;
+      setMessage(totpMessage, 'Verifying recovery code...');
+      try {
+        await API.post('/api/totp/recovery/email/verify', { otp: code });
+        const response = await API.post('/api/totp/regenerate');
+        if (recoveryForm) recoveryForm.style.display = 'none';
+        if (recoverySetup) recoverySetup.style.display = 'block';
+        if (recoverySecret) recoverySecret.textContent = response.secret;
+        if (window.ScreenlyQR && response.otpauthUri) {
+          ScreenlyQR.render('#totp-recovery-qr', response.otpauthUri, 180);
         }
+        setMessage(totpMessage, 'Scan the new QR code and verify it below.', 'success');
+        if (recoverySetupCode) recoverySetupCode.focus();
+      } catch (error) {
+        setMessage(totpMessage, error.message, 'error');
+        if (recoveryVerifyButton) recoveryVerifyButton.disabled = false;
+      }
+    });
+  }
+
+  if (recoverySetupForm) {
+    recoverySetupForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const code = recoverySetupCode ? recoverySetupCode.value.trim() : '';
+      if (!/^\d{6}$/.test(code)) {
+        setMessage(totpMessage, 'Enter a valid 6-digit authenticator code.', 'error');
+        return;
+      }
+
+      if (recoverySetupButton) recoverySetupButton.disabled = true;
+      setMessage(totpMessage, 'Activating your new authenticator...');
+      try {
+        await API.post('/api/totp/setup/verify', { code: code });
+        const user = await loadCurrentUser();
+        if (user && user.userId) {
+          saveUser(user);
+          setTotpStatus(user.userId, 'ENABLED');
+        }
+        window.location.href = user && user.role === 'ADMIN'
+          ? 'admin.html'
+          : 'index.html';
+      } catch (error) {
+        setMessage(totpMessage, error.message, 'error');
+        if (recoverySetupButton) recoverySetupButton.disabled = false;
+      }
+    });
+  }
 }
 
 async function setupSettings() {
-    if (!requireLogin()) return;
+  if (!requireLogin()) return;
 
-    // 1. Load User Profile
-    const user = currentUser || await loadCurrentUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
-    }
+  // 1. Load User Profile
+  const user = currentUser || await loadCurrentUser();
+  if (!user) {
+    window.location.href = 'login.html';
+    return;
+  }
 
-    const nameEl = qs('#user-display-name');
-    const emailEl = qs('#user-display-email');
-    const phoneEl = qs('#user-display-phone');
-    const roleEl = qs('#user-display-role');
-    const statusEl = qs('#user-display-status');
-    const joinedEl = qs('#user-display-joined');
-    const avatarEl = qs('#user-avatar-initial');
+  const nameEl = qs('#user-display-name');
+  const emailEl = qs('#user-display-email');
+  const phoneEl = qs('#user-display-phone');
+  const roleEl = qs('#user-display-role');
+  const statusEl = qs('#user-display-status');
+  const joinedEl = qs('#user-display-joined');
+  const avatarEl = qs('#user-avatar-initial');
 
-    if (nameEl) nameEl.textContent = user.name || 'User';
-    if (emailEl) emailEl.textContent = user.email || '';
-    if (phoneEl) phoneEl.textContent = user.phone || 'Not provided';
-    if (roleEl) roleEl.textContent = user.role || 'CUSTOMER';
-    if (statusEl) statusEl.textContent = user.status || 'ACTIVE';
-    if (joinedEl) joinedEl.textContent = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Recently';
-    if (avatarEl) avatarEl.textContent = (user.name || 'U').charAt(0).toUpperCase();
+  if (nameEl) nameEl.textContent = user.name || 'User';
+  if (emailEl) emailEl.textContent = user.email || '';
+  if (phoneEl) phoneEl.textContent = user.phone || 'Not provided';
+  if (roleEl) roleEl.textContent = user.role || 'CUSTOMER';
+  if (statusEl) statusEl.textContent = user.status || 'ACTIVE';
+  if (joinedEl) joinedEl.textContent = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Recently';
+  if (avatarEl) avatarEl.textContent = (user.name || 'U').charAt(0).toUpperCase();
 
-    // 2. TOTP Interface Elements
-    const badge = qs('#totp-status-badge');
-    const alertMessage = qs('#totp-alert-message');
+  // Tab switching logic (Profile Details vs Settings & Security)
+  const tabBtnProfile = qs('#tab-btn-profile');
+  const tabBtnSecurity = qs('#tab-btn-security');
+  const sectionProfile = qs('#section-profile');
+  const sectionSecurity = qs('#section-security');
 
-    const panelDisabled = qs('#panel-totp-disabled');
-    const panelSetup = qs('#panel-totp-setup');
-    const panelEnabled = qs('#panel-totp-enabled');
-    const panelRegen = qs('#panel-totp-regenerated');
-    const panelDisableConfirm = qs('#panel-totp-disable-confirm');
-
-    const btnStartSetup = qs('#btn-start-setup');
-    const btnCancelSetup = qs('#btn-cancel-setup');
-    const formVerifySetup = qs('#form-verify-setup');
-    const setupVerifyCode = qs('#setup-verify-code');
-    const setupSecretCode = qs('#totp-setup-secret');
-    const btnCopySecret = qs('#btn-copy-secret');
-
-    const btnStartRegen = qs('#btn-start-regenerate');
-    const regenSecretCode = qs('#totp-regen-secret');
-    const btnCopyRegenSecret = qs('#btn-copy-regen-secret');
-    const btnDoneRegen = qs('#btn-done-regenerate');
-
-    const btnOpenDisable = qs('#btn-open-disable');
-    const formDisableTotp = qs('#form-disable-totp');
-    const disableTotpCode = qs('#disable-totp-code');
-    const btnCancelDisable = qs('#btn-cancel-disable');
-
-    function hideAllPanels() {
-        [panelDisabled, panelSetup, panelEnabled, panelRegen, panelDisableConfirm].forEach(p => {
-            if (p) p.style.display = 'none';
-        });
-    }
-
-    function setBadgeState(state) {
-        if (!badge) return;
-        if (state === 'ENABLED') {
-            badge.className = 'badge badge-success';
-            badge.textContent = 'Active';
-        } else {
-            badge.className = 'badge badge-muted';
-            badge.textContent = 'Disabled';
-        }
-    }
-
-    function showEnabledView() {
-        hideAllPanels();
-        setBadgeState('ENABLED');
-        setTotpStatus(user.userId, 'ENABLED');
-        if (panelEnabled) panelEnabled.style.display = 'block';
-    }
-
-    function showDisabledView() {
-        hideAllPanels();
-        setBadgeState('DISABLED');
-        setTotpStatus(user.userId, 'DISABLED');
-        if (panelDisabled) panelDisabled.style.display = 'block';
-    }
-
-    // Determine initial state from cached status
-    const cached = getTotpStatus(user.userId);
-    if (cached === 'ENABLED') {
-        showEnabledView();
+  function switchTab(tab) {
+    if (tab === 'security') {
+      if (tabBtnSecurity) {
+        tabBtnSecurity.classList.add('active');
+        tabBtnSecurity.setAttribute('aria-selected', 'true');
+      }
+      if (tabBtnProfile) {
+        tabBtnProfile.classList.remove('active');
+        tabBtnProfile.setAttribute('aria-selected', 'false');
+      }
+      if (sectionSecurity) sectionSecurity.style.display = 'block';
+      if (sectionProfile) sectionProfile.style.display = 'none';
     } else {
+      if (tabBtnProfile) {
+        tabBtnProfile.classList.add('active');
+        tabBtnProfile.setAttribute('aria-selected', 'true');
+      }
+      if (tabBtnSecurity) {
+        tabBtnSecurity.classList.remove('active');
+        tabBtnSecurity.setAttribute('aria-selected', 'false');
+      }
+      if (sectionProfile) sectionProfile.style.display = 'block';
+      if (sectionSecurity) sectionSecurity.style.display = 'none';
+    }
+  }
+
+  if (tabBtnProfile) {
+    tabBtnProfile.addEventListener('click', () => {
+      switchTab('profile');
+      window.location.hash = 'profile';
+    });
+  }
+
+  if (tabBtnSecurity) {
+    tabBtnSecurity.addEventListener('click', () => {
+      switchTab('security');
+      window.location.hash = 'security';
+    });
+  }
+
+  if (window.location.hash === '#security') {
+    switchTab('security');
+  } else {
+    switchTab('profile');
+  }
+
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash === '#security') {
+      switchTab('security');
+    } else {
+      switchTab('profile');
+    }
+  });
+
+  // 2. TOTP Interface Elements
+  const badge = qs('#totp-status-badge');
+  const alertMessage = qs('#totp-alert-message');
+
+  const panelDisabled = qs('#panel-totp-disabled');
+  const panelSetup = qs('#panel-totp-setup');
+  const panelEnabled = qs('#panel-totp-enabled');
+  const panelRegen = qs('#panel-totp-regenerated');
+  const panelDisableConfirm = qs('#panel-totp-disable-confirm');
+
+  const btnStartSetup = qs('#btn-start-setup');
+  const btnCancelSetup = qs('#btn-cancel-setup');
+  const formVerifySetup = qs('#form-verify-setup');
+  const setupVerifyCode = qs('#setup-verify-code');
+  const setupSecretCode = qs('#totp-setup-secret');
+  const btnCopySecret = qs('#btn-copy-secret');
+
+  const btnStartRegen = qs('#btn-start-regenerate');
+  const regenSecretCode = qs('#totp-regen-secret');
+  const btnCopyRegenSecret = qs('#btn-copy-regen-secret');
+  const btnDoneRegen = qs('#btn-done-regenerate');
+
+  const btnOpenDisable = qs('#btn-open-disable');
+  const formDisableTotp = qs('#form-disable-totp');
+  const disableTotpCode = qs('#disable-totp-code');
+  const btnCancelDisable = qs('#btn-cancel-disable');
+
+  function hideAllPanels() {
+    [panelDisabled, panelSetup, panelEnabled, panelRegen, panelDisableConfirm].forEach(p => {
+      if (p) p.style.display = 'none';
+    });
+  }
+
+  function setBadgeState(state) {
+    if (!badge) return;
+    if (state === 'ENABLED') {
+      badge.className = 'badge badge-success';
+      badge.textContent = 'Active';
+    } else {
+      badge.className = 'badge badge-muted';
+      badge.textContent = 'Disabled';
+    }
+  }
+
+  function showEnabledView() {
+    hideAllPanels();
+    setBadgeState('ENABLED');
+    setTotpStatus(user.userId, 'ENABLED');
+    if (panelEnabled) panelEnabled.style.display = 'block';
+  }
+
+  function showDisabledView() {
+    hideAllPanels();
+    setBadgeState('DISABLED');
+    setTotpStatus(user.userId, 'DISABLED');
+    if (panelDisabled) panelDisabled.style.display = 'block';
+  }
+
+  // Determine initial state from cached status
+  const cached = getTotpStatus(user.userId);
+  if (cached === 'ENABLED') {
+    showEnabledView();
+  } else {
+    showDisabledView();
+  }
+
+  // Copy-to-clipboard helper
+  function setupCopyButton(btn, textGetter) {
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const text = textGetter();
+      if (!text || text === 'LOADING...') return;
+      try {
+        await navigator.clipboard.writeText(text);
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = originalText; }, 1800);
+      } catch (e) {
+        prompt('Copy key manually:', text);
+      }
+    });
+  }
+
+  setupCopyButton(btnCopySecret, () => setupSecretCode ? setupSecretCode.textContent : '');
+  setupCopyButton(btnCopyRegenSecret, () => regenSecretCode ? regenSecretCode.textContent : '');
+
+  /*
+   * FLOW 1: SETUP TOTP
+   */
+  if (btnStartSetup) {
+    btnStartSetup.addEventListener('click', async () => {
+      btnStartSetup.disabled = true;
+      setMessage(alertMessage, 'Generating security keys...');
+
+      try {
+        const response = await API.post('/api/totp/setup');
+        setMessage(alertMessage, '');
+        hideAllPanels();
+        if (panelSetup) panelSetup.style.display = 'block';
+
+        if (setupSecretCode) setupSecretCode.textContent = response.secret;
+        if (window.ScreenlyQR && response.otpauthUri) {
+          ScreenlyQR.render('#totp-setup-qr', response.otpauthUri, 180);
+        }
+        if (setupVerifyCode) {
+          setupVerifyCode.value = '';
+          setupVerifyCode.focus();
+        }
+      } catch (error) {
+        // Self-healing: if backend tells us TOTP is already enabled, update the UI
+        if (error.message && error.message.toLowerCase().includes('already enabled')) {
+          showEnabledView();
+          setMessage(alertMessage, 'Two-factor authentication is already active on this account.', 'success');
+        } else {
+          setMessage(alertMessage, error.message, 'error');
+        }
+      } finally {
+        btnStartSetup.disabled = false;
+      }
+    });
+  }
+
+  if (btnCancelSetup) {
+    btnCancelSetup.addEventListener('click', () => {
+      setMessage(alertMessage, '');
+      showDisabledView();
+    });
+  }
+
+  if (formVerifySetup) {
+    formVerifySetup.addEventListener('submit', async event => {
+      event.preventDefault();
+      const code = setupVerifyCode ? setupVerifyCode.value.trim() : '';
+
+      if (!/^\d{6}$/.test(code)) {
+        setMessage(alertMessage, 'Please enter a valid 6-digit code.', 'error');
+        return;
+      }
+
+      const submitBtn = qs('#btn-submit-setup-verify');
+      if (submitBtn) submitBtn.disabled = true;
+      setMessage(alertMessage, 'Verifying code and activating 2FA...');
+
+      try {
+        const response = await API.post('/api/totp/setup/verify', { code: code });
+        setMessage(alertMessage, (response && response.message) || 'Two-factor authentication enabled successfully!', 'success');
+        showEnabledView();
+      } catch (error) {
+        setMessage(alertMessage, error.message, 'error');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
+
+  /*
+   * FLOW 2: REGENERATE TOTP
+   */
+  if (btnStartRegen) {
+    btnStartRegen.addEventListener('click', async () => {
+      if (!confirm('Regenerating your 2FA secret will immediately invalidate your previous authenticator configuration. Do you wish to continue?')) {
+        return;
+      }
+
+      btnStartRegen.disabled = true;
+      setMessage(alertMessage, 'Regenerating TOTP secret...');
+
+      try {
+        const response = await API.post('/api/totp/regenerate');
+        setMessage(alertMessage, '');
+        hideAllPanels();
+        if (panelRegen) panelRegen.style.display = 'block';
+
+        if (regenSecretCode) regenSecretCode.textContent = response.secret;
+        if (window.ScreenlyQR && response.otpauthUri) {
+          ScreenlyQR.render('#totp-regen-qr', response.otpauthUri, 180);
+        }
+      } catch (error) {
+        // Self-healing: if backend says not enabled, reflect that in UI
+        if (error.message && error.message.toLowerCase().includes('not currently enabled')) {
+          showDisabledView();
+          setMessage(alertMessage, 'Two-factor authentication is not currently enabled.', 'error');
+        } else {
+          setMessage(alertMessage, error.message, 'error');
+        }
+      } finally {
+        btnStartRegen.disabled = false;
+      }
+    });
+  }
+
+  if (btnDoneRegen) {
+    btnDoneRegen.addEventListener('click', () => {
+      setMessage(alertMessage, 'New 2FA credentials confirmed.', 'success');
+      showEnabledView();
+    });
+  }
+
+  /*
+   * FLOW 3: DISABLE TOTP
+   */
+  if (btnOpenDisable) {
+    btnOpenDisable.addEventListener('click', () => {
+      setMessage(alertMessage, '');
+      hideAllPanels();
+      if (panelDisableConfirm) panelDisableConfirm.style.display = 'block';
+      if (disableTotpCode) {
+        disableTotpCode.value = '';
+        disableTotpCode.focus();
+      }
+    });
+  }
+
+  if (btnCancelDisable) {
+    btnCancelDisable.addEventListener('click', () => {
+      setMessage(alertMessage, '');
+      showEnabledView();
+    });
+  }
+
+  if (formDisableTotp) {
+    formDisableTotp.addEventListener('submit', async event => {
+      event.preventDefault();
+      const code = disableTotpCode ? disableTotpCode.value.trim() : '';
+
+      if (!/^\d{6}$/.test(code)) {
+        setMessage(alertMessage, 'Please enter a valid 6-digit code.', 'error');
+        return;
+      }
+
+      const confirmBtn = qs('#btn-confirm-disable');
+      if (confirmBtn) confirmBtn.disabled = true;
+      setMessage(alertMessage, 'Disabling two-factor authentication...');
+
+      try {
+        const response = await API.post('/api/totp/disable', { code: code });
+        setMessage(alertMessage, (response && response.message) || 'Two-factor authentication disabled successfully.', 'success');
         showDisabledView();
-    }
-
-    // Copy-to-clipboard helper
-    function setupCopyButton(btn, textGetter) {
-        if (!btn) return;
-        btn.addEventListener('click', async () => {
-            const text = textGetter();
-            if (!text || text === 'LOADING...') return;
-            try {
-                await navigator.clipboard.writeText(text);
-                const originalText = btn.textContent;
-                btn.textContent = 'Copied!';
-                setTimeout(() => { btn.textContent = originalText; }, 1800);
-            } catch (e) {
-                prompt('Copy key manually:', text);
-            }
-        });
-    }
-
-    setupCopyButton(btnCopySecret, () => setupSecretCode ? setupSecretCode.textContent : '');
-    setupCopyButton(btnCopyRegenSecret, () => regenSecretCode ? regenSecretCode.textContent : '');
-
-    /*
-     * FLOW 1: SETUP TOTP
-     */
-    if (btnStartSetup) {
-        btnStartSetup.addEventListener('click', async () => {
-            btnStartSetup.disabled = true;
-            setMessage(alertMessage, 'Generating security keys...');
-
-            try {
-                const response = await API.post('/api/totp/setup');
-                setMessage(alertMessage, '');
-                hideAllPanels();
-                if (panelSetup) panelSetup.style.display = 'block';
-
-                if (setupSecretCode) setupSecretCode.textContent = response.secret;
-                if (window.ScreenlyQR && response.otpauthUri) {
-                    ScreenlyQR.render('#totp-setup-qr', response.otpauthUri, 180);
-                }
-                if (setupVerifyCode) {
-                    setupVerifyCode.value = '';
-                    setupVerifyCode.focus();
-                }
-            } catch (error) {
-                // Self-healing: if backend tells us TOTP is already enabled, update the UI
-                if (error.message && error.message.toLowerCase().includes('already enabled')) {
-                    showEnabledView();
-                    setMessage(alertMessage, 'Two-factor authentication is already active on this account.', 'success');
-                } else {
-                    setMessage(alertMessage, error.message, 'error');
-                }
-            } finally {
-                btnStartSetup.disabled = false;
-            }
-        });
-    }
-
-    if (btnCancelSetup) {
-        btnCancelSetup.addEventListener('click', () => {
-            setMessage(alertMessage, '');
-            showDisabledView();
-        });
-    }
-
-    if (formVerifySetup) {
-        formVerifySetup.addEventListener('submit', async event => {
-            event.preventDefault();
-            const code = setupVerifyCode ? setupVerifyCode.value.trim() : '';
-
-            if (!/^\d{6}$/.test(code)) {
-                setMessage(alertMessage, 'Please enter a valid 6-digit code.', 'error');
-                return;
-            }
-
-            const submitBtn = qs('#btn-submit-setup-verify');
-            if (submitBtn) submitBtn.disabled = true;
-            setMessage(alertMessage, 'Verifying code and activating 2FA...');
-
-            try {
-                const response = await API.post('/api/totp/setup/verify', { code: code });
-                setMessage(alertMessage, (response && response.message) || 'Two-factor authentication enabled successfully!', 'success');
-                showEnabledView();
-            } catch (error) {
-                setMessage(alertMessage, error.message, 'error');
-            } finally {
-                if (submitBtn) submitBtn.disabled = false;
-            }
-        });
-    }
-
-    /*
-     * FLOW 2: REGENERATE TOTP
-     */
-    if (btnStartRegen) {
-        btnStartRegen.addEventListener('click', async () => {
-            if (!confirm('Regenerating your 2FA secret will immediately invalidate your previous authenticator configuration. Do you wish to continue?')) {
-                return;
-            }
-
-            btnStartRegen.disabled = true;
-            setMessage(alertMessage, 'Regenerating TOTP secret...');
-
-            try {
-                const response = await API.post('/api/totp/regenerate');
-                setMessage(alertMessage, '');
-                hideAllPanels();
-                if (panelRegen) panelRegen.style.display = 'block';
-
-                if (regenSecretCode) regenSecretCode.textContent = response.secret;
-                if (window.ScreenlyQR && response.otpauthUri) {
-                    ScreenlyQR.render('#totp-regen-qr', response.otpauthUri, 180);
-                }
-            } catch (error) {
-                // Self-healing: if backend says not enabled, reflect that in UI
-                if (error.message && error.message.toLowerCase().includes('not currently enabled')) {
-                    showDisabledView();
-                    setMessage(alertMessage, 'Two-factor authentication is not currently enabled.', 'error');
-                } else {
-                    setMessage(alertMessage, error.message, 'error');
-                }
-            } finally {
-                btnStartRegen.disabled = false;
-            }
-        });
-    }
-
-    if (btnDoneRegen) {
-        btnDoneRegen.addEventListener('click', () => {
-            setMessage(alertMessage, 'New 2FA credentials confirmed.', 'success');
-            showEnabledView();
-        });
-    }
-
-    /*
-     * FLOW 3: DISABLE TOTP
-     */
-    if (btnOpenDisable) {
-        btnOpenDisable.addEventListener('click', () => {
-            setMessage(alertMessage, '');
-            hideAllPanels();
-            if (panelDisableConfirm) panelDisableConfirm.style.display = 'block';
-            if (disableTotpCode) {
-                disableTotpCode.value = '';
-                disableTotpCode.focus();
-            }
-        });
-    }
-
-    if (btnCancelDisable) {
-        btnCancelDisable.addEventListener('click', () => {
-            setMessage(alertMessage, '');
-            showEnabledView();
-        });
-    }
-
-    if (formDisableTotp) {
-        formDisableTotp.addEventListener('submit', async event => {
-            event.preventDefault();
-            const code = disableTotpCode ? disableTotpCode.value.trim() : '';
-
-            if (!/^\d{6}$/.test(code)) {
-                setMessage(alertMessage, 'Please enter a valid 6-digit code.', 'error');
-                return;
-            }
-
-            const confirmBtn = qs('#btn-confirm-disable');
-            if (confirmBtn) confirmBtn.disabled = true;
-            setMessage(alertMessage, 'Disabling two-factor authentication...');
-
-            try {
-                const response = await API.post('/api/totp/disable', { code: code });
-                setMessage(alertMessage, (response && response.message) || 'Two-factor authentication disabled successfully.', 'success');
-                showDisabledView();
-            } catch (error) {
-                setMessage(alertMessage, error.message, 'error');
-            } finally {
-                if (confirmBtn) confirmBtn.disabled = false;
-            }
-        });
-    }
+      } catch (error) {
+        setMessage(alertMessage, error.message, 'error');
+      } finally {
+        if (confirmBtn) confirmBtn.disabled = false;
+      }
+    });
+  }
 }
 
 
@@ -940,9 +1077,9 @@ function setupForgetPassword() {
   }
 }
 
-async function createRazorpayOrder(bookingId) {
+async function createRazorpayOrder(bookingReference) {
   return await API.post(
-    `/api/bookings/${bookingId}/razorpay_order`
+    `/api/bookings/${encodeURIComponent(bookingReference)}/razorpay_order`
   );
 }
 
@@ -955,10 +1092,7 @@ async function setupPayment() {
   }
 
   const params = new URLSearchParams(window.location.search);
-  let bookingId = params.get('bookingId') || params.get('id') || params.get('booking_id');
-  if (bookingId === 'undefined' || bookingId === 'null') {
-    bookingId = null;
-  }
+  const bookingReference = params.get('bookingReference') || params.get('bookingId') || params.get('id') || params.get('booking_id');
 
   const bookingIdElement = qs('#booking-id');
   const amountElement = qs('#booking-amount');
@@ -971,7 +1105,7 @@ async function setupPayment() {
   const timeoutReason = qs('#timeout-reason-text');
   const reselectSeatsLink = qs('#reselect-seats-link');
 
-  if (!bookingId) {
+  if (!bookingReference || bookingReference === 'undefined' || bookingReference === 'null') {
     setMessage(message, 'Booking reference is required. Please select your seats again.', 'error');
     if (payButton) payButton.disabled = true;
     if (cancelButton) cancelButton.disabled = true;
@@ -984,10 +1118,11 @@ async function setupPayment() {
   let paymentCompleted = false;
   let activeRazorpayInstance = null;
   let hardTimeoutId = null;
+  let loadedBooking = null;
 
   function showTimeoutView(reasonText) {
     if (activeRazorpayInstance && typeof activeRazorpayInstance.close === 'function') {
-      try { activeRazorpayInstance.close(); } catch (ignored) {}
+      try { activeRazorpayInstance.close(); } catch (ignored) { }
     }
     if (activeSection) activeSection.style.display = 'none';
     if (timeoutSection) timeoutSection.style.display = 'block';
@@ -1000,10 +1135,11 @@ async function setupPayment() {
     if (paymentCompleted || isPaymentProcessing) return;
     showTimeoutView(reason || 'Your 2-minute payment window has expired and your held seats have been released.');
     try {
-      await API.remove(`/api/bookings/${bookingId}`);
-    } catch (ignored) {}
-    sessionStorage.removeItem(`booking_timer_${bookingId}`);
-    sessionStorage.removeItem(`booking_hold_${bookingId}`);
+      const bId = loadedBooking ? loadedBooking.bookingId : bookingReference;
+      await API.remove(`/api/bookings/${bId}`);
+    } catch (ignored) { }
+    sessionStorage.removeItem(`booking_timer_${bookingReference}`);
+    sessionStorage.removeItem(`booking_hold_${bookingReference}`);
   }
 
   async function handleCancelPayment() {
@@ -1013,12 +1149,13 @@ async function setupPayment() {
     if (cancelButton) cancelButton.disabled = true;
     setMessage(message, 'Cancelling booking and redirecting to home page...', 'error');
     try {
-      await API.remove(`/api/bookings/${bookingId}`);
+      const bId = loadedBooking ? loadedBooking.bookingId : bookingReference;
+      await API.remove(`/api/bookings/${bId}`);
     } catch (e) {
       console.warn('Booking cancellation error:', e);
     }
-    sessionStorage.removeItem(`booking_timer_${bookingId}`);
-    sessionStorage.removeItem(`booking_hold_${bookingId}`);
+    sessionStorage.removeItem(`booking_timer_${bookingReference}`);
+    sessionStorage.removeItem(`booking_hold_${bookingReference}`);
     setTimeout(() => {
       window.location.href = 'index.html?cancelled=1';
     }, 1200);
@@ -1032,12 +1169,13 @@ async function setupPayment() {
     const desc = failureReason ? `: ${failureReason}` : '';
     setMessage(message, `Payment failed${desc}. Cancelling booking and returning to home...`, 'error');
     try {
-      await API.remove(`/api/bookings/${bookingId}`);
+      const bId = loadedBooking ? loadedBooking.bookingId : bookingReference;
+      await API.remove(`/api/bookings/${bId}`);
     } catch (e) {
       console.warn('Booking cancellation error:', e);
     }
-    sessionStorage.removeItem(`booking_timer_${bookingId}`);
-    sessionStorage.removeItem(`booking_hold_${bookingId}`);
+    sessionStorage.removeItem(`booking_timer_${bookingReference}`);
+    sessionStorage.removeItem(`booking_hold_${bookingReference}`);
     setTimeout(() => {
       window.location.href = 'index.html?failed=1';
     }, 1500);
@@ -1048,13 +1186,17 @@ async function setupPayment() {
   }
 
   try {
-    const { booking, show, movie, screen } = await fetchFullBookingDetails(bookingId);
+    const { booking, show, movie, screen } = await fetchFullBookingDetails(bookingReference);
 
     if (!booking) {
       throw new Error('Booking could not be loaded.');
     }
 
-    if (bookingIdElement) bookingIdElement.textContent = `#${booking.bookingId}`;
+    loadedBooking = booking;
+    const currentRef = booking.bookingReference || bookingReference;
+    const bookingId = booking.bookingId;
+
+    if (bookingIdElement) bookingIdElement.textContent = currentRef;
     if (amountElement) amountElement.textContent = formatMoney(booking.totalAmount);
 
     const movieElement = qs('#booking-movie');
@@ -1094,10 +1236,8 @@ async function setupPayment() {
 
     if (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') {
       setMessage(message, 'This booking has already been confirmed. Opening ticket...', 'success');
-      if (payButton) payButton.disabled = true;
-      if (cancelButton) cancelButton.disabled = true;
       setTimeout(() => {
-        window.location.href = `booking.html?bookingId=${bookingId}`;
+        window.location.href = `booking.html?bookingReference=${encodeURIComponent(currentRef)}`;
       }, 1000);
       return;
     }
@@ -1108,14 +1248,14 @@ async function setupPayment() {
     }
 
     // 2-minute active visible payment window (120 seconds)
-    const savedTimer = sessionStorage.getItem(`booking_timer_${bookingId}`);
+    const savedTimer = sessionStorage.getItem(`booking_timer_${bookingReference}`);
     let activeDeadline;
     if (savedTimer && !isNaN(Number(savedTimer)) && Number(savedTimer) > Date.now() - 3600000) {
       activeDeadline = Number(savedTimer);
     } else {
       activeDeadline = Date.now() + 2 * 60 * 1000;
     }
-    sessionStorage.setItem(`booking_timer_${bookingId}`, String(activeDeadline));
+    sessionStorage.setItem(`booking_timer_${bookingReference}`, String(activeDeadline));
 
     // Hard cutoff is 30 seconds after the 2-minute timer (at 2 minutes 30 seconds)
     const hardCutoffTime = activeDeadline + 30 * 1000;
@@ -1128,11 +1268,8 @@ async function setupPayment() {
       () => {
         timerExpired = true;
         if (!isModalOpen) {
-          // User was idle on the page and never opened Razorpay (or closed it before 2:00)
           triggerTimeoutCancellation('Payment time has expired (2 minutes limit). Cancelling booking and returning to home...');
         } else {
-          // User is currently inside the Razorpay modal!
-          // Give 30-second grace period for OTP authorization (until 2:30 hard cutoff).
           setMessage(message, 'Payment window closing soon. Please complete authorization in Razorpay.', 'warning');
         }
       }
@@ -1163,7 +1300,7 @@ async function setupPayment() {
       if (payButton) payButton.disabled = true;
 
       try {
-        const razorpayOrder = await createRazorpayOrder(bookingId);
+        const razorpayOrder = await createRazorpayOrder(currentRef);
         console.log('Razorpay order created:', razorpayOrder);
 
         const options = {
@@ -1171,7 +1308,7 @@ async function setupPayment() {
           amount: Math.round(Number(razorpayOrder.amount) * 100),
           currency: razorpayOrder.currency,
           name: 'Screenly Cinemas',
-          description: `Movie booking #${bookingId}`,
+          description: `Booking reference ${currentRef}`,
           order_id: razorpayOrder.orderId,
 
           handler: async function (response) {
@@ -1180,24 +1317,23 @@ async function setupPayment() {
             setMessage(message, 'Payment authorized! Verifying with server...', 'success');
             try {
               const verification = await API.post(
-                `/api/bookings/${bookingId}/razorpay_verify`,
+                `/api/bookings/${encodeURIComponent(currentRef)}/razorpay_verify`,
                 {
                   razorpayPaymentId: response.razorpay_payment_id,
                   razorpayOrderId: response.razorpay_order_id,
                   razorpaySignature: response.razorpay_signature
                 }
               );
-              const verifiedBookingId = verification.bookingId;
 
               paymentCompleted = true;
               isPaymentProcessing = false;
               if (hardTimeoutId) clearTimeout(hardTimeoutId);
-              sessionStorage.removeItem(`booking_timer_${bookingId}`);
-              sessionStorage.removeItem(`booking_hold_${bookingId}`);
+              sessionStorage.removeItem(`booking_timer_${bookingReference}`);
+              sessionStorage.removeItem(`booking_hold_${bookingReference}`);
               setMessage(message, 'Payment verified successfully! Opening your ticket...', 'success');
 
               setTimeout(() => {
-                window.location.href = `booking.html?bookingId=${verifiedBookingId}`;
+                window.location.href = `booking.html?bookingReference=${encodeURIComponent(currentRef)}`;
               }, 1000);
             } catch (error) {
               isPaymentProcessing = false;
@@ -1389,13 +1525,24 @@ async function loadDetails() {
   dateInput.value = todayIso();
   try {
     const movie = await API.get(`/api/movies/${id}`);
-    detail.innerHTML = `<div class="detail-poster">${escapeHtml(movie.title)}</div>
-    <div class="detail-copy"><p class="eyebrow">Movie details</p>
-    <h1>${escapeHtml(movie.title)}</h1>
-    <p>${escapeHtml(movie.description || 'No description available.')}</p>
-    <p class="movie-meta">${escapeHtml(movie.genre || 'Feature')} &middot; 
-    ${escapeHtml(movie.language || 'Original')} &middot; 
-    ${movie.durationMinutes} minutes</p></div>`;
+    const isUpcoming = movie.status === 'UPCOMING';
+    const releaseDateStr = movie.releaseDate ? formatDate(movie.releaseDate) : '';
+
+    detail.innerHTML = `<div class="detail-poster" style="position: relative;">
+      ${escapeHtml(movie.title)}
+      ${isUpcoming ? '<span class="badge badge-upcoming" style="position:absolute;top:16px;right:16px;">Upcoming</span>' : ''}
+    </div>
+    <div class="detail-copy">
+      <p class="eyebrow">${isUpcoming ? 'Coming Soon' : 'Movie details'}</p>
+      <h1>${escapeHtml(movie.title)}</h1>
+      <p>${escapeHtml(movie.description || 'No description available.')}</p>
+      <p class="movie-meta">
+        ${escapeHtml(movie.genre || 'Feature')} &middot; 
+        ${escapeHtml(movie.language || 'Original')} &middot; 
+        ${movie.durationMinutes} minutes
+        ${releaseDateStr ? ` &middot; <strong>Releases:</strong> ${escapeHtml(releaseDateStr)}` : ''}
+      </p>
+    </div>`;
   }
   catch (error) {
     setMessage(message, error.message, 'error');
@@ -1425,8 +1572,8 @@ async function loadDetails() {
           </div>
           <div class="show-slots-grid">
             ${(theatre.shows || []).map(show => `
-              <a class="show-slot-box" href="seats.html?showId=${show.showId}" title="${escapeHtml(show.screenName || 'Screen ' + show.screenId)}: ${formatTime(show.startTime)} - ${formatTime(show.endTime)}">
-                <span class="slot-screen">${escapeHtml(show.screenName || 'Screen ' + show.screenId)}</span>
+              <a class="show-slot-box" href="seats.html?showId=${show.showId}" title="${escapeHtml(show.screenName || 'Screen')}: ${formatTime(show.startTime)} - ${formatTime(show.endTime)}">
+                <span class="slot-screen">${escapeHtml(show.screenName || 'Screen')}</span>
                 <strong class="slot-time">${formatTime(show.startTime)}</strong>
                 <span class="slot-action">${isAdmin ? 'View Layout' : (show.regularPrice ? 'From ₹' + show.regularPrice : 'Select Seats')}</span>
               </a>
@@ -1467,7 +1614,14 @@ async function loadSeats() {
   const selected = new Map();
   try {
     const show = await API.get(`/api/shows/${showId}`);
-    summary.textContent = `${formatDate(show.showDate)} | ${formatTime(show.startTime)} - ${formatTime(show.endTime)} | Screen ${show.screenId}`;
+    let screenName = show.screenName;
+    if (!screenName && show.screenId) {
+      try {
+        const scr = await API.get(`/api/screens/${show.screenId}`);
+        screenName = scr ? scr.name : null;
+      } catch (e) { }
+    }
+    summary.textContent = `${formatDate(show.showDate)} | ${formatTime(show.startTime)} - ${formatTime(show.endTime)}${screenName ? ` | ${screenName}` : ''}`;
     const seats = await API.get(`/api/show-seats/show/${showId}`);
     renderSeatMap(seats);
     if (isAdmin && sidebar) {
@@ -1514,43 +1668,47 @@ async function loadSeats() {
         <div class="seat-row">
           <span class="row-label">${escapeHtml(row)}</span>
           ${rowSeats.sort((a, b) => a.seatNumber - b.seatNumber).map(seat => {
-            const status = (seat.status || '').toUpperCase();
-            const isAvailable = status === 'AVAILABLE';
-            const isBooked = status === 'BOOKED';
-            const isHeld = status === 'HELD' || status === 'HOLD';
+        const status = (seat.status || '').toUpperCase();
+        const isAvailable = status === 'AVAILABLE';
+        const isBooked = status === 'BOOKED';
+        const isHeld = status === 'HELD' || status === 'HOLD';
 
-            let statusClass = 'available';
-            let labelSuffix = '';
-            if (isBooked) {
-              statusClass = 'booked';
-              labelSuffix = ' (Booked)';
-            } else if (isHeld) {
-              statusClass = 'held';
-              labelSuffix = ' (On Hold)';
-            } else if (!isAvailable) {
-              statusClass = 'booked';
-              labelSuffix = ' (Unavailable)';
-            }
+        let statusClass = 'available';
+        let labelSuffix = '';
+        if (isBooked) {
+          statusClass = 'booked';
+          labelSuffix = ' (Booked)';
+        } else if (isHeld) {
+          statusClass = 'held';
+          labelSuffix = ' (On Hold)';
+        } else if (!isAvailable) {
+          statusClass = 'booked';
+          labelSuffix = ' (Unavailable)';
+        }
 
-            if (isAdmin) {
-              statusClass += ' admin-view';
-            }
+        if (isAdmin) {
+          statusClass += ' admin-view';
+        }
 
-            const disabledAttr = (isAdmin || !isAvailable) ? 'disabled' : '';
-            return `<button class="seat ${statusClass}" data-seat-id="${seat.showSeatId}" data-price="${seat.price}" ${disabledAttr} aria-label="Row ${escapeHtml(row)} seat ${seat.seatNumber}${labelSuffix}">${seat.seatNumber}</button>`;
-          }).join('')}
+        const disabledAttr = (isAdmin || !isAvailable) ? 'disabled' : '';
+        const seatLabel = `${row}${seat.seatNumber}`;
+        return `<button class="seat ${statusClass}" data-seat-id="${seat.showSeatId}" data-seat-label="${escapeHtml(seatLabel)}" data-price="${seat.price}" ${disabledAttr} aria-label="Row ${escapeHtml(row)} seat ${seat.seatNumber}${labelSuffix}">${seat.seatNumber}</button>`;
+      }).join('')}
         </div>`
       ).join('');
 
     if (!isAdmin) {
       map.querySelectorAll('.seat.available:not([disabled])').forEach(seat => seat.addEventListener('click', () => {
         const seatId = Number(seat.dataset.seatId);
+        const seatLabel = seat.dataset.seatLabel || `Seat ${seat.textContent.trim()}`;
+        const price = Number(seat.dataset.price);
+
         if (selected.has(seatId)) {
           selected.delete(seatId);
           seat.classList.remove('selected');
         }
         else {
-          selected.set(seatId, Number(seat.dataset.price));
+          selected.set(seatId, { price, label: seatLabel });
           seat.classList.add('selected');
         }
         updateSummary();
@@ -1561,8 +1719,14 @@ async function loadSeats() {
   function updateSummary() {
     if (isAdmin) return;
     const entries = [...selected.entries()];
-    if (selectedLabel) selectedLabel.textContent = entries.length ? entries.map(([id]) => `Seat ${id}`).join(', ') : 'No seats selected';
-    if (total) total.textContent = formatMoney(entries.reduce((sum, [, price]) => sum + price, 0));
+    if (selectedLabel) {
+      selectedLabel.textContent = entries.length
+        ? entries.map(([, info]) => info.label).join(', ')
+        : 'No seats selected';
+    }
+    if (total) {
+      total.textContent = formatMoney(entries.reduce((sum, [, info]) => sum + info.price, 0));
+    }
     if (button) button.disabled = !entries.length;
   }
 
@@ -1573,13 +1737,15 @@ async function loadSeats() {
       try {
         const result = await API.post('/api/bookings', { showId: Number(showId), showSeatIds: [...selected.keys()] });
         const bookingId = result && (result.bookingId ?? result.bookingId ?? result.booking_id ?? result.id);
+        const bookingReference = result && result.bookingReference;
         const parsedHold = result && result.holdUntil ? parseDateTime(result.holdUntil) : null;
         const holdTime = parsedHold ? parsedHold.getTime() : (Date.now() + 2 * 60 * 1000);
-        if (bookingId) {
-          sessionStorage.setItem(`booking_hold_${bookingId}`, String(holdTime));
-          window.location.href = `payment.html?bookingId=${bookingId}`;
+        const refToUse = bookingReference || bookingId;
+        if (refToUse) {
+          sessionStorage.setItem(`booking_hold_${refToUse}`, String(holdTime));
+          window.location.href = `payment.html?bookingReference=${encodeURIComponent(refToUse)}`;
         } else {
-          throw new Error('Booking created but reference ID is missing.');
+          throw new Error('Booking created but reference is missing.');
         }
       }
       catch (error) {
@@ -1611,7 +1777,7 @@ function renderTicketCard(booking, show, movie, screen) {
       <div class="ticket-grid">
         <div class="ticket-field">
           <span class="ticket-field-label">Booking Reference</span>
-          <span class="ticket-field-value">#${booking.bookingId}</span>
+          <span class="ticket-field-value">${escapeHtml(booking.bookingReference || ('#' + booking.bookingId))}</span>
         </div>
         <div class="ticket-field">
           <span class="ticket-field-label">Date & Showtime</span>
@@ -1652,7 +1818,7 @@ function renderTicketCard(booking, show, movie, screen) {
 
 function renderTicketQr(booking) {
   if (!booking || !booking.ticketCode || booking.ticketStatus !== 'VALID'
-      || !window.ScreenlyQR) {
+    || !window.ScreenlyQR) {
     return;
   }
 
@@ -1687,61 +1853,168 @@ async function fetchFullBookingDetails(bookingId) {
 async function loadBookings() {
   if (!requireLogin()) return;
   const list = qs('#booking-list');
+  const upcomingList = qs('#upcoming-booking-list');
+  const completedList = qs('#completed-booking-list');
+  const confirmedSlot = qs('#confirmed-ticket-slot');
   const message = qs('#page-message');
 
   if (currentUser && currentUser.role === 'ADMIN') {
-    list.innerHTML = `<div style="padding: 24px; background: var(--white); border: 1px solid var(--line); border-radius: 6px;">
+    const adminMsg = `<div style="padding: 24px; background: var(--white); border: 1px solid var(--line); border-radius: 6px;">
       <h3>Administrator Account</h3>
       <p class="muted" style="margin: 8px 0 16px;">Admins do not possess customer ticket bookings. To manage cinema shows, movies, and screens, visit the Admin Dashboard.</p>
       <a href="admin.html" class="button button-small">Go to Admin Dashboard</a>
     </div>`;
+    if (upcomingList) upcomingList.innerHTML = adminMsg;
+    if (completedList) completedList.innerHTML = '';
     return;
   }
+
   const params = new URLSearchParams(window.location.search);
-  const bookedId = params.get('booked') || params.get('bookingId') || params.get('id');
+  const bookedRef = params.get('booked') || params.get('bookingReference') || params.get('bookingId') || params.get('id');
 
   try {
     const bookings = await API.get('/api/bookings');
 
-    let ticketHtml = '';
-    if (bookedId) {
-      setMessage(message, `🎉 Booking #${bookedId} confirmed successfully! Here is your ticket.`, 'success');
+    if (bookedRef && confirmedSlot) {
       try {
-        const full = await fetchFullBookingDetails(bookedId);
-        ticketHtml = `<div class="ticket-container">${renderTicketCard(full.booking, full.show, full.movie, full.screen)}</div><hr style="margin: 30px 0; border: 0; border-top: 1px solid var(--line);">`;
-        list.innerHTML = ticketHtml;
+        const full = await fetchFullBookingDetails(bookedRef);
+        const displayRef = (full.booking && full.booking.bookingReference) || ('#' + (full.booking && full.booking.bookingId ? full.booking.bookingId : bookedRef));
+        setMessage(message, `🎉 Booking ${displayRef} confirmed successfully! Here is your ticket.`, 'success');
+        confirmedSlot.innerHTML = `<div class="ticket-container" style="margin-bottom: 36px;">${renderTicketCard(full.booking, full.show, full.movie, full.screen)}</div><hr style="margin: 30px 0 40px; border: 0; border-top: 1px solid var(--line);">`;
         renderTicketQr(full.booking);
       } catch (err) {
         // Continue if detail load fails
       }
     }
 
-    if (!bookings.length && !ticketHtml) {
-      list.innerHTML = '<p class="muted">You have no bookings yet.</p>';
+    if (!bookings || !bookings.length) {
+      if (upcomingList) upcomingList.innerHTML = '<p class="muted">You have no upcoming bookings.</p>';
+      if (completedList) completedList.innerHTML = '<p class="muted">You have no completed bookings yet.</p>';
       return;
     }
 
-    const cardsHtml = bookings.map(booking => `<article class="booking-card"><div>
-        <h3>Booking #${booking.bookingId}</h3>
-        <p>Show #${booking.showId} &middot; ${(booking.seats || []).map(seat => `${escapeHtml(seat.rowLabel || '')}${seat.seatNumber}`).join(', ')}</p>
-        <p>Booked ${booking.bookedAt ? (parseDateTime(booking.bookedAt) ? parseDateTime(booking.bookedAt).toLocaleString() : new Date(booking.bookedAt).toLocaleString()) : 'recently'}</p></div>
-        <div><p class="status ${booking.status === 'CANCELLED' ? 'cancelled' : ''}">${escapeHtml(booking.status)}</p>
-        <p><strong>₹${formatMoney(booking.totalAmount)}</strong></p>
-        <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
-          <a class="button button-small button-light" href="booking.html?bookingId=${booking.bookingId}">View Ticket</a>
-          ${booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' ? `<button class="button button-small danger" data-cancel="${booking.bookingId}">Cancel</button>` : ''}
-        </div></div></article>`).join('');
+    // Resolve unique shows and movies for rich booking cards
+    const uniqueShowIds = [...new Set(bookings.map(b => b.showId).filter(Boolean))];
+    const showMap = {};
+    await Promise.all(uniqueShowIds.map(async sid => {
+      try {
+        const s = await API.get(`/api/shows/${sid}`);
+        showMap[sid] = s;
+      } catch (e) { }
+    }));
 
-    list.innerHTML = ticketHtml + cardsHtml;
-    if (bookedId) {
-      const ticket = document.getElementById(`confirmed-ticket-${bookedId}`);
-      if (ticket) {
-        const booking = bookings.find(item => String(item.bookingId) === String(bookedId));
-        if (booking) renderTicketQr(booking);
+    const uniqueMovieIds = [...new Set(Object.values(showMap).map(s => s.movieId).filter(Boolean))];
+    const movieMap = {};
+    await Promise.all(uniqueMovieIds.map(async mid => {
+      try {
+        const m = await API.get(`/api/movies/${mid}`);
+        movieMap[mid] = m;
+      } catch (e) { }
+    }));
+
+    // Categorize into Upcoming and Completed
+    const now = new Date();
+    const upcomingBookings = [];
+    const completedBookings = [];
+
+    bookings.forEach(booking => {
+      const show = showMap[booking.showId];
+      let isPastShow = false;
+      if (show && show.showDate && show.endTime) {
+        const timeParts = String(show.endTime).split(':').map(Number);
+        const [h = 0, m = 0] = timeParts;
+        const endDateTime = new Date(`${show.showDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`);
+        if (!isNaN(endDateTime.getTime()) && endDateTime < now) {
+          isPastShow = true;
+        }
       }
+
+      const isUsed = booking.ticketStatus === 'USED';
+      const isCancelled = booking.status === 'CANCELLED';
+      const isCompleted = booking.status === 'COMPLETED';
+
+      if (booking.status === 'CONFIRMED' && !isPastShow && !isUsed) {
+        upcomingBookings.push(booking);
+      } else {
+        completedBookings.push(booking);
+      }
+    });
+
+    function renderBookingItem(booking) {
+      const show = showMap[booking.showId];
+      const movie = show ? movieMap[show.movieId] : null;
+
+      const seatListStr = (booking.seats || [])
+        .map(seat => `${escapeHtml(seat.rowLabel || '')}${seat.seatNumber}`)
+        .join(', ') || 'Seats reserved';
+
+      const movieTitle = movie ? movie.title : (show ? `Show #${booking.showId}` : `Booking #${booking.bookingId}`);
+      const showDateStr = show ? `${formatDate(show.showDate)} · ${formatTime(show.startTime)}` : '';
+      const bookedDateStr = booking.bookedAt
+        ? (parseDateTime(booking.bookedAt) ? parseDateTime(booking.bookedAt).toLocaleString() : new Date(booking.bookedAt).toLocaleString())
+        : 'Recently';
+
+      const isCancelled = booking.status === 'CANCELLED';
+      const isUsed = booking.ticketStatus === 'USED';
+      const isCompleted = booking.status === 'COMPLETED' || isUsed;
+      const isEligibleCancel = booking.status === 'CONFIRMED' && !isUsed && !isCancelled;
+
+      let statusBadge = '';
+      if (isCancelled) {
+        statusBadge = '<span class="status cancelled">Cancelled</span>';
+      } else if (isUsed) {
+        statusBadge = '<span class="status" style="background:#e0e7ff;color:#3730a3;font-weight:600;">Checked In</span>';
+      } else if (isCompleted) {
+        statusBadge = '<span class="status" style="background:#f1f5f9;color:#475569;font-weight:600;">Completed</span>';
+      } else {
+        statusBadge = '<span class="status badge-active" style="background:#dcfce7;color:#15803d;font-weight:600;">Confirmed</span>';
+      }
+
+      return `<article class="booking-card">
+        <div class="booking-card-details">
+          <h3 class="booking-movie-title">${escapeHtml(movieTitle)}</h3>
+          <p style="margin: 4px 0 6px; color: var(--muted); font-size: 0.92rem;">
+            ${showDateStr ? `<strong>Showtime:</strong> ${showDateStr} &middot; ` : ''}
+            <strong>Seats:</strong> ${seatListStr}
+          </p>
+          <p style="margin: 0; font-size: 0.82rem; color: var(--muted);">
+            Ref: ${escapeHtml(booking.bookingReference || ('#' + booking.bookingId))} &middot; Booked ${bookedDateStr}
+          </p>
+        </div>
+        <div style="text-align: right;">
+          <div style="margin-bottom: 6px;">${statusBadge}</div>
+          <p style="margin: 4px 0 10px;"><strong>₹${formatMoney(booking.totalAmount)}</strong></p>
+          <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+            <a class="button button-small button-light" href="booking.html?bookingReference=${encodeURIComponent(booking.bookingReference || booking.bookingId)}">View Ticket</a>
+            ${isEligibleCancel ? `<button class="button button-small danger" data-cancel="${booking.bookingId}">Cancel</button>` : ''}
+          </div>
+        </div>
+      </article>`;
     }
-    list.querySelectorAll('[data-cancel]').forEach(button => button.addEventListener('click', () => cancelBooking(button.dataset.cancel)));
-  } catch (error) { setMessage(message, error.message, 'error'); }
+
+    if (upcomingList) {
+      upcomingList.innerHTML = upcomingBookings.length
+        ? upcomingBookings.map(renderBookingItem).join('')
+        : '<p class="muted">No upcoming bookings. Ready to watch something new?</p>';
+    }
+
+    if (completedList) {
+      completedList.innerHTML = completedBookings.length
+        ? completedBookings.map(renderBookingItem).join('')
+        : '<p class="muted">No completed or past bookings found.</p>';
+    }
+
+    // Fallback for any legacy container
+    if (list && !upcomingList && !completedList) {
+      list.innerHTML = bookings.map(renderBookingItem).join('');
+    }
+
+    document.querySelectorAll('[data-cancel]').forEach(button =>
+      button.addEventListener('click', () => cancelBooking(button.dataset.cancel))
+    );
+  } catch (error) {
+    setMessage(message, error.message, 'error');
+  }
 }
 
 async function loadTicketView() {
@@ -1749,19 +2022,20 @@ async function loadTicketView() {
   const container = qs('#ticket-container');
   const message = qs('#page-message');
   const params = new URLSearchParams(window.location.search);
-  const bookingId = params.get('id') || params.get('bookingId') || params.get('booked');
+  const bookingRef = params.get('bookingReference') || params.get('reference') || params.get('id') || params.get('bookingId') || params.get('booked');
 
-  if (!bookingId) {
-    setMessage(message, 'A Booking ID is required to view a ticket.', 'error');
+  if (!bookingRef) {
+    setMessage(message, 'A Booking Reference is required to view a ticket.', 'error');
     if (container) container.innerHTML = '<p class="muted"><a href="bookings.html">Go to My Bookings</a></p>';
     return;
   }
 
   try {
-    const full = await fetchFullBookingDetails(bookingId);
+    const full = await fetchFullBookingDetails(bookingRef);
     container.innerHTML = renderTicketCard(full.booking, full.show, full.movie, full.screen);
     renderTicketQr(full.booking);
-    setMessage(message, `🎉 Booking #${bookingId} confirmed successfully! Here is your ticket.`, 'success');
+    const displayRef = (full.booking && full.booking.bookingReference) || ('#' + full.booking.bookingId);
+    setMessage(message, `🎉 Booking ${displayRef} confirmed successfully! Here is your ticket.`, 'success');
   } catch (error) {
     setMessage(message, error.message, 'error');
     if (container) container.innerHTML = '<p class="muted"><a href="bookings.html">Go to My Bookings</a></p>';
@@ -1811,18 +2085,129 @@ const ADMIN_CONFIG = {
 
 async function loadAdmin() {
   if (!requireAdmin()) return;
-  setupAdminTicketCheckin();
   const tabs = qs('#admin-tabs');
   tabs.addEventListener('click', event => { const tab = event.target.closest('[data-resource]'); if (!tab) return; tabs.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item === tab)); renderAdminResource(tab.dataset.resource); });
   renderAdminResource('movies');
+}
+
+async function loadTicketCheckin() {
+  if (!requireAdmin()) return;
+  setupAdminTicketCheckin();
+}
+
+function renderTicketCheckinDetails(data, isSuccess) {
+  if (!data) return '';
+  const isUsed = data.ticketStatus === 'USED' || data.code === 'TICKET_ALREADY_USED';
+  const isCancelled = data.ticketStatus === 'CANCELLED' || data.code === 'TICKET_CANCELLED';
+  const isFuture = data.code === 'FUTURE_SHOW';
+  const isExpired = data.code === 'TICKET_EXPIRED';
+
+  let badgeClass = 'status-success';
+  let badgeText = '✓ Verified & Checked In';
+
+  if (!isSuccess) {
+    if (isUsed) {
+      badgeClass = 'status-warning';
+      badgeText = '⚠️ Already Checked In';
+    } else if (isCancelled) {
+      badgeClass = 'status-danger';
+      badgeText = '❌ Ticket Cancelled';
+    } else if (isFuture) {
+      badgeClass = 'status-info';
+      badgeText = '⏳ Future Show';
+    } else if (isExpired) {
+      badgeClass = 'status-danger';
+      badgeText = '⏰ Show Ended / Expired';
+    } else {
+      badgeClass = 'status-warning';
+      badgeText = '⚠️ Admission Warning';
+    }
+  }
+
+  const movieTitle = data.movieTitle ? escapeHtml(data.movieTitle) : (data.bookingId ? `Booking #${data.bookingId}` : 'Movie');
+  const showDateStr = data.showDate ? formatDate(data.showDate) : '';
+  const timeStr = (data.startTime && data.endTime)
+    ? `${formatTime(data.startTime)} - ${formatTime(data.endTime)}`
+    : (data.startTime ? formatTime(data.startTime) : '');
+  const timingDisplay = showDateStr ? `${showDateStr}${timeStr ? ` &middot; ${timeStr}` : ''}` : 'Timing unavailable';
+
+  const venueDisplay = (data.theatreName || data.screenName)
+    ? `${data.theatreName ? escapeHtml(data.theatreName) : ''}${data.theatreName && data.screenName ? ' &middot; ' : ''}${data.screenName ? escapeHtml(data.screenName) : ''}`
+    : 'Screen';
+
+  return `
+    <article class="ticket-result-card ${isSuccess ? 'card-verified' : 'card-warning'}">
+      <div class="result-card-header">
+        <div>
+          <span class="result-card-eyebrow">Customer Admission Pass</span>
+          <h2 class="result-movie-title">${movieTitle}</h2>
+          <p class="result-venue">${venueDisplay}</p>
+        </div>
+        <div>
+          <span class="checkin-badge-status ${badgeClass}">${badgeText}</span>
+        </div>
+      </div>
+      <div class="result-card-body">
+        <div class="result-grid">
+          <div class="result-field">
+            <span class="result-label">Showtime</span>
+            <span class="result-value">${timingDisplay}</span>
+          </div>
+          <div class="result-field">
+            <span class="result-label">Confirmed Seats</span>
+            <span class="result-value result-seats-badge">${escapeHtml(data.seats || 'Seats reserved')}</span>
+          </div>
+          <div class="result-field">
+            <span class="result-label">Customer Name</span>
+            <span class="result-value">${escapeHtml(data.customerName || 'Customer')}</span>
+          </div>
+          <div class="result-field">
+            <span class="result-label">Customer Email</span>
+            <span class="result-value">${escapeHtml(data.customerEmail || 'N/A')}</span>
+          </div>
+          <div class="result-field">
+            <span class="result-label">Booking Reference</span>
+            <span class="result-value font-mono">${escapeHtml(data.bookingReference || ('#' + data.bookingId))}</span>
+          </div>
+          <div class="result-field">
+            <span class="result-label">Amount Paid</span>
+            <span class="result-value price-highlight">₹${formatMoney(data.totalAmount)}</span>
+          </div>
+          <div class="result-field">
+            <span class="result-label">Ticket Code</span>
+            <span class="result-value font-mono" style="font-size: 0.85rem;">${escapeHtml(data.ticketCode || '')}</span>
+          </div>
+          <div class="result-field">
+            <span class="result-label">Ticket Status</span>
+            <span class="result-value"><strong>${escapeHtml(data.ticketStatus || (isSuccess ? 'USED' : 'VALID'))}</strong></span>
+          </div>
+        </div>
+      </div>
+    </article>
+  `;
 }
 
 function setupAdminTicketCheckin() {
   const form = qs('#ticket-checkin-form');
   const input = qs('#ticket-checkin-code');
   const button = qs('#ticket-checkin-button');
+  const clearBtn = qs('#ticket-checkin-clear');
   const message = qs('#ticket-checkin-message');
+  const detailsSlot = qs('#ticket-checkin-details');
   if (!form || !input || !button || !message) return;
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      setMessage(message, '');
+      if (detailsSlot) {
+        detailsSlot.innerHTML = '';
+        detailsSlot.style.display = 'none';
+      }
+      clearBtn.style.display = 'none';
+      input.focus();
+    });
+  }
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -1833,14 +2218,30 @@ function setupAdminTicketCheckin() {
     }
 
     button.disabled = true;
-    setMessage(message, 'Checking ticket...');
+    setMessage(message, 'Verifying ticket code...');
     try {
       const result = await API.post('/api/admin/tickets/checkin', { ticketCode });
-      setMessage(message, `${result.message} ${result.bookingId ? `Booking #${result.bookingId}.` : ''}`, 'success');
-      input.value = '';
-      input.focus();
+      const refStr = result.bookingReference ? ` (Ref: ${result.bookingReference})` : (result.bookingId ? ` (Booking #${result.bookingId})` : '');
+      setMessage(message, `${result.message}${refStr}`, 'success');
+
+      if (detailsSlot) {
+        detailsSlot.innerHTML = renderTicketCheckinDetails(result, true);
+        detailsSlot.style.display = 'block';
+      }
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+      input.select();
     } catch (error) {
+      const errData = error.data || null;
       setMessage(message, error.message || 'Ticket could not be verified.', 'error');
+
+      if (detailsSlot && errData && (errData.movieTitle || errData.bookingId || errData.bookingReference)) {
+        detailsSlot.innerHTML = renderTicketCheckinDetails(errData, false);
+        detailsSlot.style.display = 'block';
+      } else if (detailsSlot) {
+        detailsSlot.innerHTML = '';
+        detailsSlot.style.display = 'none';
+      }
+      if (clearBtn) clearBtn.style.display = 'inline-block';
       input.select();
     } finally {
       button.disabled = false;

@@ -5,12 +5,15 @@ import java.time.LocalDateTime;
 
 public class BookingCreatedResponse {
     private int bookingId;
+    private String bookingReference;
     private String message;
     private LocalDateTime holdUntil;
     private BigDecimal amount;
 
-    public BookingCreatedResponse(int bookingId, String message, BigDecimal amount, LocalDateTime holdUntil) {
+    public BookingCreatedResponse(int bookingId, String bookingReference, String message,
+            BigDecimal amount, LocalDateTime holdUntil) {
         this.bookingId = bookingId;
+        this.bookingReference = bookingReference;
         this.message = message;
         this.amount = amount;
         this.holdUntil = holdUntil;
@@ -18,6 +21,10 @@ public class BookingCreatedResponse {
 
     public int getbookingId() {
         return bookingId;
+    }
+
+    public String getBookingReference() {
+        return bookingReference;
     }
 
     public String getMessage() {

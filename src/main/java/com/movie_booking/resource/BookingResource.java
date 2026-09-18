@@ -70,12 +70,20 @@ public class BookingResource {
     }
 
     @GET
-    @Path("/{bookingId}")
-    public BookingResponse getBookingById(@PathParam("bookingId") int bookingId) throws SQLException {
+    @Path("/{reference}")
+    public BookingResponse getBookingByReferenceOrId(@PathParam("reference") String reference) throws SQLException {
         int userId = getAuthenticatedUserId();
-        Booking booking = bookingService.getBookingById(userId, bookingId);
+        Booking booking = bookingService.getBookingByReference(userId, reference);
         if (booking == null) {
-            throw new ResourceNotFoundException("Booking not found with ID: " + bookingId);
+            try {
+                int bookingId = Integer.parseInt(reference);
+                booking = bookingService.getBookingById(userId, bookingId);
+            } catch (NumberFormatException ignored) {
+                // Not a numeric booking ID
+            }
+        }
+        if (booking == null) {
+            throw new ResourceNotFoundException("Booking not found: " + reference);
         }
         return toBookingResponse(booking);
     }
@@ -88,7 +96,12 @@ public class BookingResource {
         
         Booking booking = bookingService.getBookingById(userId, bookingId);
         
-        return new BookingCreatedResponse(bookingId, "Payment Pending", booking.getTotalAmount(), booking.getHoldUntil());
+        return new BookingCreatedResponse(
+            bookingId,
+            booking.getBookingReference(),
+            "Payment Pending",
+            booking.getTotalAmount(),
+            booking.getHoldUntil());
 
 
     }
@@ -116,26 +129,26 @@ public class BookingResource {
     }
 
     @POST
-    @Path("/{bookingId}/razorpay_order")
+    @Path("/{bookingReference}/razorpay_order")
     public RazorpayOrderResponse createRazorpayOrder(
-            @PathParam("bookingId") int bookingId) throws SQLException {
+            @PathParam("bookingReference") String bookingReference) throws SQLException {
 
         int userId = getAuthenticatedUserId();
 
-        return bookingService.createRazorpayOrder(userId, bookingId);
+        return bookingService.createRazorpayOrder(userId, bookingReference);
     }
 
     @POST
-    @Path("/{bookingId}/razorpay_verify")
+    @Path("/{bookingReference}/razorpay_verify")
     public RazorpayVerificationResponse verifyRazorpayPayment(
-            @PathParam("bookingId") int bookingId,
+            @PathParam("bookingReference") String bookingReference,
             RazorpayPaymentRequest request) throws SQLException {
 
         int userId = getAuthenticatedUserId();
 
-        bookingService.verifyRazorpayPayment(
+        int bookingId = bookingService.verifyRazorpayPayment(
                 userId,
-                bookingId,
+                bookingReference,
                 request);
 
         return new RazorpayVerificationResponse(
@@ -161,6 +174,7 @@ public class BookingResource {
     private BookingResponse toBookingResponse(Booking booking) {
         BookingResponse response = new BookingResponse();
         response.setBookingId(booking.getBookingId());
+        response.setBookingReference(booking.getBookingReference());
         response.setUserId(booking.getUserId());
         response.setShowId(booking.getShowId());
         response.setTotalAmount(booking.getTotalAmount());

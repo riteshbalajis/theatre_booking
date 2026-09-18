@@ -1,8 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Screenly | My bookings</title><link rel="stylesheet" href="css/styles.css"></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screenly | My bookings</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
 <body data-page="bookings">
   <div id="site-header"></div>
-  <main class="page-shell"><section class="page-heading"><p class="eyebrow">Your account</p><h1>My bookings</h1><p class="muted">Review your tickets and cancel eligible bookings.</p></section><div id="booking-list" class="booking-list" aria-live="polite"></div><div id="page-message" class="message" role="status"></div></main>
-  <script src="js/qrcode.min.js"></script><script src="js/api.js"></script><script src="js/common.js"></script><script src="js/app.js"></script>
-</body></html>
+  <main class="page-shell">
+    <section class="page-heading">
+      <p class="eyebrow">Your account</p>
+      <h1>My bookings</h1>
+      <p class="muted">Review your upcoming show tickets and view past booking history.</p>
+    </section>
+
+    <div id="confirmed-ticket-slot"></div>
+    <div id="page-message" class="message" role="status"></div>
+
+    <section class="booking-section-group" id="upcoming-bookings-section">
+      <div class="booking-section-heading">
+        <p class="eyebrow">Valid & Active</p>
+        <h2>Upcoming Bookings</h2>
+      </div>
+      <div id="upcoming-booking-list" class="booking-list" aria-live="polite"></div>
+    </section>
+
+    <section class="booking-section-group" id="completed-bookings-section" style="margin-top: 48px;">
+      <div class="booking-section-heading">
+        <p class="eyebrow">History & Past Shows</p>
+        <h2>Completed Bookings</h2>
+      </div>
+      <div id="completed-booking-list" class="booking-list" aria-live="polite"></div>
+    </section>
+
+    <div id="booking-list" style="display: none;"></div>
+  </main>
+  <script src="js/qrcode.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

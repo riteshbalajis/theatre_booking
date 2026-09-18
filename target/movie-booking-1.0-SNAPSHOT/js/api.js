@@ -19,6 +19,7 @@ const API = {
       const message = body && body.message ? body.message : `Request failed (${response.status}).`;
       const error = new Error(message);
       error.status = response.status;
+      error.data = body;
       throw error;
     }
     return body;

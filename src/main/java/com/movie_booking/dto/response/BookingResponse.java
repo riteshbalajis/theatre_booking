@@ -9,6 +9,7 @@ import com.movie_booking.model.TicketStatus;
 
 public class BookingResponse {
     private int bookingId;
+    private String bookingReference;
     private int userId;
     private int showId;
     private BigDecimal totalAmount;
@@ -23,6 +24,8 @@ public class BookingResponse {
 
     public int getBookingId() { return bookingId; }
     public void setBookingId(int bookingId) { this.bookingId = bookingId; }
+    public String getBookingReference() { return bookingReference; }
+    public void setBookingReference(String bookingReference) { this.bookingReference = bookingReference; }
     public int getUserId() { return userId; }
     public void setUserId(int userId) { this.userId = userId; }
     public int getShowId() { return showId; }

@@ -18,6 +18,12 @@ public interface BookingDao {
 
     Booking findById(Connection connection, int bookingId) throws SQLException;
 
+    Booking findByBookingReference(int userId, String bookingReference)
+        throws SQLException;
+
+    boolean updateRazorpayOrderId(int bookingId, int userId, String razorpayOrderId)
+        throws SQLException;
+
     List<Booking> findByUserId(int userId) throws SQLException;
 
     List<Booking> findByShowId(int showId) throws SQLException;

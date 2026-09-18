@@ -27,12 +27,22 @@
         <!-- Notification Message -->
         <div id="settings-global-message" class="message" role="status"></div>
 
-        <div class="settings-grid">
+        <!-- Tab Navigation -->
+        <nav class="settings-tabs" role="tablist" aria-label="Account Tabs">
+            <button id="tab-btn-profile" class="settings-tab active" type="button" role="tab" aria-selected="true" aria-controls="section-profile">
+                <span>👤</span> Profile Details
+            </button>
+            <button id="tab-btn-security" class="settings-tab" type="button" role="tab" aria-selected="false" aria-controls="section-security">
+                <span>⚙️</span> Settings & Security
+            </button>
+        </nav>
+
+        <div class="settings-content-wrap">
 
             <!-- ================================================= -->
-            <!-- CARD 1: PROFILE SUMMARY                           -->
+            <!-- CARD 1: PROFILE DETAILS                           -->
             <!-- ================================================= -->
-            <section class="settings-card profile-card">
+            <section id="section-profile" class="settings-card profile-card settings-tab-panel active" role="tabpanel" aria-labelledby="tab-btn-profile">
                 <div class="card-header">
                     <h2>Profile Details</h2>
                 </div>
@@ -78,7 +88,7 @@
             <!-- ================================================= -->
             <!-- CARD 2: TWO-FACTOR AUTHENTICATION (TOTP)          -->
             <!-- ================================================= -->
-            <section class="settings-card security-card">
+            <section id="section-security" class="settings-card security-card settings-tab-panel" role="tabpanel" aria-labelledby="tab-btn-security" style="display: none;">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <h2>Two-Factor Authentication (TOTP)</h2>

@@ -29,6 +29,7 @@ import com.movie_booking.service.TotpService;
 import com.movie_booking.service.TotpServiceImpl;
 import com.movie_booking.service.UserService;
 import com.movie_booking.service.UserServiceImpl;
+import com.movie_booking.util.GoogleTokenVerifier;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -89,6 +90,14 @@ public class AuthResource {
 
         return Response.ok(user).build();
     }
+
+    @GET
+    @Path("/google/client-id")
+    public Response getGoogleClientId() {
+        String clientId = GoogleTokenVerifier.getClientId();
+        return Response.ok(Map.of("clientId", clientId)).build();
+    }
+
 
     @POST
     @Path("/login")

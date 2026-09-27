@@ -379,6 +379,8 @@ function setupLogin() {
     );
   }
 
+  initGoogleSignIn();
+
   /*
    * STEP 1: Email + Password login
    */
@@ -1470,6 +1472,37 @@ function setupRegister() {
   });
 }
 
+async function initGoogleSignIn() {
+  const btnContainer = qs('#google-signin-btn');
+  if (!btnContainer) return;
+
+  try {
+    const res = await API.get('/api/auth/google/client-id');
+    if (!res || !res.clientId) return;
+
+    const render = () => {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        google.accounts.id.initialize({
+          client_id: res.clientId,
+          callback: handleGoogleLogin
+        });
+        google.accounts.id.renderButton(btnContainer, {
+          type: 'standard',
+          size: 'large',
+          theme: 'outline',
+          text: 'signin_with',
+          shape: 'rectangular'
+        });
+      } else {
+        setTimeout(render, 100);
+      }
+    };
+    render();
+  } catch (error) {
+    console.error('Failed to initialize Google Sign-In:', error);
+  }
+}
+
 async function handleGoogleLogin(response) {
   console.log('Google login response:', response);
   const message = qs('#form-message');
@@ -1490,6 +1523,7 @@ async function handleGoogleLogin(response) {
     setMessage(message, error.message, 'error');
   }
 }
+window.handleGoogleLogin = handleGoogleLogin;
 
 async function loadDetails() {
   const id = new URLSearchParams(window.location.search).get('id');

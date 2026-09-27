@@ -13,6 +13,27 @@
 
     <packaging>war</packaging>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+                    <packagingExcludes>WEB-INF/classes/.env</packagingExcludes>
+                </configuration>
+            </plugin>
+        </plugins>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>.env</exclude>
+                </excludes>
+            </resource>
+        </resources>
+    </build>
+
     <dependencies>
 
         <!-- Jersey Servlet integration -->
@@ -102,6 +123,12 @@
             <groupId>org.glassfish.jersey.core</groupId>
             <artifactId>jersey-client</artifactId>
             <version>2.35</version> <!-- Use 3.x if using jakarta.ws.rs -->
+        </dependency>
+
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>6.3.3</version>
         </dependency>
 
     </dependencies>

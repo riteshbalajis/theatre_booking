@@ -9,16 +9,20 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import com.movie_booking.config.AppConfig;
 
 public class GoogleTokenVerifier {
 
-    private static final String CLIENT_ID ="272663743548-itpthoqm2u1uik1kfe77aa13ts49omva.apps.googleusercontent.com";
-
+    private static final String CLIENT_ID = AppConfig.getRequired("GOOGLE_CLIENT_ID");
     private static final GoogleIdTokenVerifier VERIFIER =
             new GoogleIdTokenVerifier.Builder(
-                    new NetHttpTransport(),GsonFactory.getDefaultInstance())
+                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
                     .setAudience(Collections.singletonList(CLIENT_ID))
                     .build();
+
+    public static String getClientId() {
+        return CLIENT_ID;
+    }
 
     public static GoogleIdToken verify(String credential)
             throws GeneralSecurityException, IOException {

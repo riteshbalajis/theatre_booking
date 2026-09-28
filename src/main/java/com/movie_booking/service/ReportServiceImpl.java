@@ -1,19 +1,20 @@
 package com.movie_booking.service;
 
-import com.movie_booking.dao.ReportDao;
-import com.movie_booking.dao.UserDao;
-import com.movie_booking.dao.ReportDaoImpl;
-import com.movie_booking.dao.UserDaoImpl;
-import com.movie_booking.dto.response.TheatreReportResponse;
-import com.movie_booking.dto.response.MovieReportResponse;
-import com.movie_booking.model.User;
-import com.movie_booking.model.UserRole;
-import com.movie_booking.model.UserStatus;
-
-
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
+
+import com.movie_booking.dao.ReportDao;
+import com.movie_booking.dao.ReportDaoImpl;
+import com.movie_booking.dao.UserDao;
+import com.movie_booking.dao.UserDaoImpl;
+import com.movie_booking.dto.response.MovieReportResponse;
+import com.movie_booking.dto.response.MovieTheatreReportResponse;
+import com.movie_booking.dto.response.OverallReportResponse;
+import com.movie_booking.dto.response.TheatreReportResponse;
+import com.movie_booking.model.User;
+import com.movie_booking.model.UserRole;
+import com.movie_booking.model.UserStatus;
 
 public class ReportServiceImpl implements ReportService {
 
@@ -79,6 +80,37 @@ public class ReportServiceImpl implements ReportService {
         return reportDao.getMovieReport(date);
     }
 
+    @Override
+    public OverallReportResponse getOverallReport(
+            LocalDate date,
+            int authenticatedUserId)
+            throws SQLException {
+
+        requireAdmin(authenticatedUserId);
+
+        if (date == null) {
+            throw new IllegalArgumentException("Report date cannot be null.");
+        }
+
+        return reportDao.getOverallReport(date);
+    }
+
+    @Override
+    public List<MovieTheatreReportResponse> getMovieTheatreReport(
+            LocalDate date,
+            int authenticatedUserId) throws SQLException {
+
+        requireAdmin(authenticatedUserId);
+
+        if (date == null) {
+            throw new IllegalArgumentException(
+                    "Report date cannot be null."
+            );
+        }
+
+        return reportDao.getMovieTheatreReport(date);
+    }
+
     private void requireAdmin(int authenticatedUserId)
             throws SQLException {
 
@@ -97,7 +129,4 @@ public class ReportServiceImpl implements ReportService {
         }
     }
 
-    
 }
-
-    

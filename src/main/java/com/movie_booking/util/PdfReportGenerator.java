@@ -15,6 +15,8 @@ import org.openpdf.text.pdf.PdfPTable;
 import org.openpdf.text.pdf.PdfWriter;
 
 import com.movie_booking.dto.response.MovieReportResponse;
+import com.movie_booking.dto.response.MovieTheatreReportResponse;
+import com.movie_booking.dto.response.OverallReportResponse;
 import com.movie_booking.dto.response.TheatreReportResponse;
 
 public final class PdfReportGenerator {
@@ -102,14 +104,9 @@ public final class PdfReportGenerator {
         document.close();
     }
 
-    private static void addHeaderCell(
-            PdfPTable table,
-            String text) {
+    private static void addHeaderCell(PdfPTable table, String text) {
 
-        Font font = FontFactory.getFont(
-                FontFactory.HELVETICA_BOLD,
-                10
-        );
+        Font font = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10);
 
         PdfPCell cell = new PdfPCell(
                 new Phrase(text, font)
@@ -136,7 +133,6 @@ public final class PdfReportGenerator {
 
         document.open();
 
-        // ---------- TITLE ----------
         Font titleFont = FontFactory.getFont(
                 FontFactory.HELVETICA_BOLD,
                 18
@@ -151,7 +147,6 @@ public final class PdfReportGenerator {
 
         document.add(title);
 
-        // ---------- DATE ----------
         Paragraph reportDate = new Paragraph(
                 "Date: " + date
         );
@@ -162,7 +157,6 @@ public final class PdfReportGenerator {
 
         document.add(new Paragraph(" "));
 
-        // ---------- TABLE ----------
         PdfPTable table = new PdfPTable(5);
 
         table.setWidthPercentage(100);
@@ -198,6 +192,75 @@ public final class PdfReportGenerator {
         }
 
         document.add(table);
+
+        document.close();
+    }
+
+    public static void generateOverallReportPdf(String filePath, LocalDate date, OverallReportResponse report) throws Exception {
+
+        Document document = new Document();
+
+        PdfWriter.getInstance(document, new FileOutputStream(filePath));
+
+        document.open();
+
+        document.add(new Paragraph("OVERALL DAILY REPORT"));
+        document.add(new Paragraph("Date: " + report.getReportDate()));
+
+        document.add(new Paragraph(" "));
+        document.add(new Paragraph("Total Bookings: " + report.getTotalBookings()));
+        document.add(new Paragraph("Seats Sold: " + report.getSeatsSold()));
+        document.add(new Paragraph("Total Revenue: " + report.getTotalRevenue()));
+
+        document.close();
+
+    }
+
+    public static void generateMovieTheatreReport(
+            List<MovieTheatreReportResponse> reports,
+            String filePath) throws Exception {
+
+        Document document = new Document();
+
+        PdfWriter.getInstance(
+                document,
+                new FileOutputStream(filePath)
+        );
+
+        document.open();
+
+        document.add(
+                new Paragraph("MOVIE - THEATRE REPORT")
+        );
+
+        document.add(new Paragraph(" "));
+
+        for (MovieTheatreReportResponse report : reports) {
+
+            document.add(new Paragraph(
+                    "Movie: " + report.getMovieTitle()
+            ));
+
+            document.add(new Paragraph(
+                    "Theatre: " + report.getTheatreName()
+            ));
+
+            document.add(new Paragraph(
+                    "Total Bookings: " + report.getTotalBookings()
+            ));
+
+            document.add(new Paragraph(
+                    "Seats Sold: " + report.getSeatsSold()
+            ));
+
+            document.add(new Paragraph(
+                    "Total Revenue: ₹" + report.getTotalRevenue()
+            ));
+
+            document.add(new Paragraph(
+                    "----------------------------------------"
+            ));
+        }
 
         document.close();
     }

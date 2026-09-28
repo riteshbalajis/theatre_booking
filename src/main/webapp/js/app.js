@@ -2372,6 +2372,45 @@ async function renderAdminReports() {
 
   const today = todayIso();
 
+  const REPORT_CONFIG = {
+    theatre: {
+      label: 'Theatre Report (Venue Performance)',
+      title: 'Theatre Performance Report',
+      endpoint: '/api/reports/theatre',
+      pdfEndpoint: '/api/reports/theatre/pdf',
+      pdfFilePrefix: 'theatre-report',
+      entityLabel: 'Theatres',
+      type: 'theatre'
+    },
+    movie: {
+      label: 'Movie Report (Box Office Performance)',
+      title: 'Movie Box Office Performance',
+      endpoint: '/api/reports/movie',
+      pdfEndpoint: '/api/reports/movie/pdf',
+      pdfFilePrefix: 'movie-report',
+      entityLabel: 'Movies',
+      type: 'movie'
+    },
+    movie_theatre: {
+      label: 'Movie & Theatre Report (Cross Breakdown)',
+      title: 'Movie & Theatre Breakdown Report',
+      endpoint: '/api/reports/movie_theatre',
+      pdfEndpoint: '/api/reports/movie_theatre/pdf',
+      pdfFilePrefix: 'movie-theatre-report',
+      entityLabel: 'Movie & Theatre Pairings',
+      type: 'movie_theatre'
+    },
+    overall: {
+      label: 'Overall Platform Summary Report',
+      title: 'Overall Platform Performance Summary',
+      endpoint: '/api/reports/overall',
+      pdfEndpoint: '/api/reports/overall/pdf',
+      pdfFilePrefix: 'overall-report',
+      entityLabel: 'Platform Summary',
+      type: 'overall'
+    }
+  };
+
   workspace.innerHTML = `
     <div class="reports-dashboard">
       <div class="admin-toolbar" style="margin-bottom: 24px;">
@@ -2380,7 +2419,7 @@ async function renderAdminReports() {
             <span style="font-size: 1.5rem;">📊</span> Reports & Analytics
           </h2>
           <p class="muted" style="margin: 4px 0 0; font-size: 0.95rem;">
-            Generate and download business performance reports by theatre or movie for any date.
+            Generate and download business performance reports by theatre, movie, cross-breakdown, or full platform overview.
           </p>
         </div>
       </div>
@@ -2395,9 +2434,11 @@ async function renderAdminReports() {
               <select id="report-type-select" name="reportType" class="report-input-field report-select">
                 <option value="theatre" selected>Theatre Report (Venue Performance)</option>
                 <option value="movie">Movie Report (Box Office Performance)</option>
+                <option value="movie_theatre">Movie &amp; Theatre Report (Cross Breakdown)</option>
+                <option value="overall">Overall Platform Summary Report</option>
               </select>
             </div>
-            <span class="report-hint">Aggregated booking & revenue data by theatre or movie</span>
+            <span class="report-hint">Select a report category to analyze performance</span>
           </div>
 
           <div class="report-control-group">
@@ -2474,6 +2515,7 @@ async function renderAdminReports() {
 
   async function triggerPdfDownload() {
     const reportType = typeSelect.value;
+    const config = REPORT_CONFIG[reportType] || REPORT_CONFIG.theatre;
     const date = dateInput.value;
 
     if (!date) {
@@ -2488,10 +2530,10 @@ async function renderAdminReports() {
     const originalHtml = downloadBtn.innerHTML;
     downloadBtn.disabled = true;
     downloadBtn.innerHTML = '<span class="report-spinner-small"></span> Downloading...';
-    setStatus('Generating and downloading PDF report...', 'info');
+    setStatus(`Generating and downloading ${config.title} PDF...`, 'info');
 
     try {
-      const downloadPath = `${API_CONTEXT_PATH}/api/reports/${reportType}/pdf?date=${encodeURIComponent(date)}`;
+      const downloadPath = `${API_CONTEXT_PATH}${config.pdfEndpoint}?date=${encodeURIComponent(date)}`;
       const response = await fetch(downloadPath, {
         credentials: 'same-origin'
       });
@@ -2512,14 +2554,14 @@ async function renderAdminReports() {
       const blobUrl = window.URL.createObjectURL(blob);
       const tempA = document.createElement('a');
       tempA.href = blobUrl;
-      const fileName = `${reportType}-report-${date}.pdf`;
+      const fileName = `${config.pdfFilePrefix}-${date}.pdf`;
       tempA.download = fileName;
       document.body.appendChild(tempA);
       tempA.click();
       tempA.remove();
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
 
-      setStatus(`✓ ${reportType === 'theatre' ? 'Theatre' : 'Movie'} report for ${formatDate(date)} downloaded successfully!`, 'success');
+      setStatus(`✓ ${config.title} for ${formatDate(date)} downloaded successfully!`, 'success');
     } catch (error) {
       setStatus(error.message || 'Failed to download PDF report.', 'error');
     } finally {
@@ -2530,6 +2572,7 @@ async function renderAdminReports() {
 
   async function loadPreview() {
     const reportType = typeSelect.value;
+    const config = REPORT_CONFIG[reportType] || REPORT_CONFIG.theatre;
     const date = dateInput.value;
 
     if (!date) {
@@ -2548,9 +2591,9 @@ async function renderAdminReports() {
     resultsView.innerHTML = '';
 
     try {
-      const data = await API.get(`/api/reports/${reportType}?date=${encodeURIComponent(date)}`);
+      const data = await API.get(`${config.endpoint}?date=${encodeURIComponent(date)}`);
       loadingEl.style.display = 'none';
-      renderPreview(reportType, date, data || []);
+      renderPreview(reportType, date, data);
     } catch (error) {
       loadingEl.style.display = 'none';
       resultsView.innerHTML = `
@@ -2563,10 +2606,141 @@ async function renderAdminReports() {
     }
   }
 
-  function renderPreview(reportType, date, items) {
-    const isTheatre = reportType === 'theatre';
-    const reportTitle = isTheatre ? 'Theatre Performance' : 'Movie Box Office Performance';
-    const entityLabel = isTheatre ? 'Theatres' : 'Movies';
+  function renderPreview(reportType, date, data) {
+    const config = REPORT_CONFIG[reportType] || REPORT_CONFIG.theatre;
+    const formattedDate = formatDate(date);
+
+    if (reportType === 'overall') {
+      const totalRevenue = Number(data?.totalRevenue || 0);
+      const totalBookings = Number(data?.totalBookings || 0);
+      const totalSeats = Number(data?.seatsSold || 0);
+      const hasActivity = totalBookings > 0 || totalSeats > 0 || totalRevenue > 0;
+
+      if (!hasActivity) {
+        resultsView.innerHTML = `
+          <div class="report-card report-empty-state">
+            <div class="report-empty-icon">📁</div>
+            <h3>No Records Found for ${formattedDate}</h3>
+            <p class="muted" style="max-width: 500px; margin: 8px auto 18px;">
+              There are no finalized bookings or revenue records recorded across the platform on ${formattedDate}.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+              <button type="button" class="button button-small" id="btn-empty-pdf">Download Report PDF Anyway</button>
+            </div>
+          </div>
+        `;
+        const emptyBtn = qs('#btn-empty-pdf', resultsView);
+        if (emptyBtn) emptyBtn.addEventListener('click', triggerPdfDownload);
+        return;
+      }
+
+      const avgTicketPrice = totalSeats > 0 ? totalRevenue / totalSeats : 0;
+      const avgBookingValue = totalBookings > 0 ? totalRevenue / totalBookings : 0;
+
+      resultsView.innerHTML = `
+        <div class="report-stats-grid">
+          <div class="report-stat-card card-revenue">
+            <div class="stat-card-top">
+              <span class="stat-label">Total Revenue</span>
+              <span class="stat-icon-wrap icon-revenue">₹</span>
+            </div>
+            <div class="stat-value">₹${formatMoney(totalRevenue)}</div>
+            <div class="stat-footnote">Total gross revenue on ${formattedDate}</div>
+          </div>
+
+          <div class="report-stat-card card-bookings">
+            <div class="stat-card-top">
+              <span class="stat-label">Total Bookings</span>
+              <span class="stat-icon-wrap icon-bookings">🎟️</span>
+            </div>
+            <div class="stat-value">${totalBookings.toLocaleString()}</div>
+            <div class="stat-footnote">Completed customer transactions</div>
+          </div>
+
+          <div class="report-stat-card card-seats">
+            <div class="stat-card-top">
+              <span class="stat-label">Seats Sold</span>
+              <span class="stat-icon-wrap icon-seats">🪑</span>
+            </div>
+            <div class="stat-value">${totalSeats.toLocaleString()}</div>
+            <div class="stat-footnote">Total tickets issued across all screens</div>
+          </div>
+
+          <div class="report-stat-card card-aov">
+            <div class="stat-card-top">
+              <span class="stat-label">Avg Booking Value</span>
+              <span class="stat-icon-wrap icon-aov">📈</span>
+            </div>
+            <div class="stat-value">₹${formatMoney(avgBookingValue)}</div>
+            <div class="stat-footnote">Average revenue per transaction</div>
+          </div>
+        </div>
+
+        <div class="report-card report-table-card">
+          <div class="report-table-header">
+            <div>
+              <span class="eyebrow" style="font-size: 0.72rem;">Executive Platform Summary &middot; ${formattedDate}</span>
+              <h3 style="margin: 3px 0 0; font-size: 1.25rem;">Overall Platform Performance</h3>
+            </div>
+            <button type="button" id="btn-table-pdf" class="button button-small" style="display: inline-flex; align-items: center; gap: 6px;">
+              <span>📥</span> Download PDF
+            </button>
+          </div>
+
+          <div class="report-table-scroll">
+            <table class="admin-table report-custom-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">#</th>
+                  <th>Performance Metric</th>
+                  <th>Key Indicator</th>
+                  <th style="text-align: right;">Reported Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="report-col-idx">1</td>
+                  <td class="report-col-name"><strong>Gross Platform Revenue</strong></td>
+                  <td class="muted">Cumulative amount paid for confirmed seats</td>
+                  <td style="text-align: right;" class="report-col-revenue">₹${formatMoney(totalRevenue)}</td>
+                </tr>
+                <tr>
+                  <td class="report-col-idx">2</td>
+                  <td class="report-col-name"><strong>Total Completed Bookings</strong></td>
+                  <td class="muted">Total distinct reservation orders processed</td>
+                  <td style="text-align: right;"><span class="badge-num">${totalBookings.toLocaleString()}</span></td>
+                </tr>
+                <tr>
+                  <td class="report-col-idx">3</td>
+                  <td class="report-col-name"><strong>Total Admissions / Seats Sold</strong></td>
+                  <td class="muted">Total movie theatre seats reserved and confirmed</td>
+                  <td style="text-align: right;"><span class="badge-num">${totalSeats.toLocaleString()}</span></td>
+                </tr>
+                <tr>
+                  <td class="report-col-idx">4</td>
+                  <td class="report-col-name"><strong>Average Ticket Price / Seat</strong></td>
+                  <td class="muted">Weighted gross realization per sold ticket</td>
+                  <td style="text-align: right;" class="report-col-revenue">₹${formatMoney(avgTicketPrice)}</td>
+                </tr>
+                <tr>
+                  <td class="report-col-idx">5</td>
+                  <td class="report-col-name"><strong>Average Order Value (AOV)</strong></td>
+                  <td class="muted">Mean booking spend per reservation transaction</td>
+                  <td style="text-align: right;" class="report-col-revenue">₹${formatMoney(avgBookingValue)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      const tablePdfBtn = qs('#btn-table-pdf', resultsView);
+      if (tablePdfBtn) tablePdfBtn.addEventListener('click', triggerPdfDownload);
+      return;
+    }
+
+    // List-based reports: theatre, movie, movie_theatre
+    const items = Array.isArray(data) ? data : [];
 
     let totalRevenue = 0;
     let totalBookings = 0;
@@ -2578,15 +2752,13 @@ async function renderAdminReports() {
       totalSeats += Number(item.seatsSold || 0);
     });
 
-    const formattedDate = formatDate(date);
-
     if (!items.length) {
       resultsView.innerHTML = `
         <div class="report-card report-empty-state">
           <div class="report-empty-icon">📁</div>
           <h3>No Records Found for ${formattedDate}</h3>
           <p class="muted" style="max-width: 500px; margin: 8px auto 18px;">
-            There are no finalized bookings or revenue records recorded for ${isTheatre ? 'theatres' : 'movies'} on ${formattedDate}.
+            There are no finalized bookings or revenue records recorded for ${config.title.toLowerCase()} on ${formattedDate}.
           </p>
           <div style="display: flex; gap: 10px; justify-content: center;">
             <button type="button" class="button button-small" id="btn-empty-pdf">Download Report PDF Anyway</button>
@@ -2597,6 +2769,9 @@ async function renderAdminReports() {
       if (emptyBtn) emptyBtn.addEventListener('click', triggerPdfDownload);
       return;
     }
+
+    const isMovieTheatre = reportType === 'movie_theatre';
+    const isTheatre = reportType === 'theatre';
 
     resultsView.innerHTML = `
       <div class="report-stats-grid">
@@ -2629,11 +2804,11 @@ async function renderAdminReports() {
 
         <div class="report-stat-card card-entities">
           <div class="stat-card-top">
-            <span class="stat-label">Active ${entityLabel}</span>
-            <span class="stat-icon-wrap icon-entities">${isTheatre ? '🏢' : '🎬'}</span>
+            <span class="stat-label">Active ${config.entityLabel}</span>
+            <span class="stat-icon-wrap icon-entities">${isTheatre ? '🏢' : (isMovieTheatre ? '🎬' : '🎬')}</span>
           </div>
           <div class="stat-value">${items.length}</div>
-          <div class="stat-footnote">${entityLabel} with sales activity</div>
+          <div class="stat-footnote">${config.entityLabel} with sales activity</div>
         </div>
       </div>
 
@@ -2641,7 +2816,7 @@ async function renderAdminReports() {
         <div class="report-table-header">
           <div>
             <span class="eyebrow" style="font-size: 0.72rem;">Live Summary &middot; ${formattedDate}</span>
-            <h3 style="margin: 3px 0 0; font-size: 1.25rem;">${reportTitle}</h3>
+            <h3 style="margin: 3px 0 0; font-size: 1.25rem;">${config.title}</h3>
           </div>
           <button type="button" id="btn-table-pdf" class="button button-small" style="display: inline-flex; align-items: center; gap: 6px;">
             <span>📥</span> Download PDF
@@ -2653,7 +2828,9 @@ async function renderAdminReports() {
             <thead>
               <tr>
                 <th style="width: 50px;">#</th>
-                <th>${isTheatre ? 'Theatre Name' : 'Movie Title'}</th>
+                ${isMovieTheatre
+                  ? '<th>Movie Title</th><th>Theatre Name</th>'
+                  : `<th>${isTheatre ? 'Theatre Name' : 'Movie Title'}</th>`}
                 <th style="text-align: right;">Total Bookings</th>
                 <th style="text-align: right;">Seats Sold</th>
                 <th style="text-align: right;">Total Revenue (₹)</th>
@@ -2661,13 +2838,13 @@ async function renderAdminReports() {
             </thead>
             <tbody>
               ${items.map((row, index) => {
-                const name = isTheatre
-                  ? (row.theatreName || `Theatre #${row.theatreId}`)
-                  : (row.movieTitle || `Movie #${row.movieId}`);
                 return `
                   <tr>
                     <td class="report-col-idx">${index + 1}</td>
-                    <td class="report-col-name"><strong>${escapeHtml(name)}</strong></td>
+                    ${isMovieTheatre
+                      ? `<td class="report-col-name"><strong>🎬 ${escapeHtml(row.movieTitle || `Movie #${row.movieId}`)}</strong></td>
+                         <td class="report-col-name"><span>🏢 ${escapeHtml(row.theatreName || `Theatre #${row.theatreId}`)}</span></td>`
+                      : `<td class="report-col-name"><strong>${escapeHtml(isTheatre ? (row.theatreName || `Theatre #${row.theatreId}`) : (row.movieTitle || `Movie #${row.movieId}`))}</strong></td>`}
                     <td style="text-align: right;"><span class="badge-num">${Number(row.totalBookings || 0).toLocaleString()}</span></td>
                     <td style="text-align: right;"><span class="badge-num">${Number(row.seatsSold || 0).toLocaleString()}</span></td>
                     <td style="text-align: right;" class="report-col-revenue">₹${formatMoney(row.totalRevenue)}</td>
@@ -2677,7 +2854,7 @@ async function renderAdminReports() {
             </tbody>
             <tfoot>
               <tr class="report-total-row">
-                <td colspan="2" style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85rem;">Grand Total</td>
+                <td colspan="${isMovieTheatre ? 3 : 2}" style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85rem;">Grand Total</td>
                 <td style="text-align: right; font-weight: 700;">${totalBookings.toLocaleString()}</td>
                 <td style="text-align: right; font-weight: 700;">${totalSeats.toLocaleString()}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--teal-dark); font-size: 1.05rem;">₹${formatMoney(totalRevenue)}</td>

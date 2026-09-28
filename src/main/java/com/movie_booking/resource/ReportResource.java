@@ -16,6 +16,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.movie_booking.dto.response.MovieReportResponse;
+import com.movie_booking.dto.response.MovieTheatreReportResponse;
+import com.movie_booking.dto.response.OverallReportResponse;
 import com.movie_booking.dto.response.TheatreReportResponse;
 import com.movie_booking.exception.UnauthorizedException;
 import com.movie_booking.service.ReportService;
@@ -71,6 +73,42 @@ public class ReportResource {
     }
 
     @GET
+    @Path("/overall")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getOverallReport(
+            @QueryParam("date") String date)
+            throws SQLException {
+
+        LocalDate reportDate = LocalDate.parse(date);
+
+        OverallReportResponse response
+                = reportService.getOverallReport(
+                        reportDate,
+                        getAuthenticatedUserId()
+                );
+
+        return Response.ok(response).build();
+    }
+
+    @GET
+    @Path("/movie_theatre")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getMovieTheatreReport(
+            @QueryParam("date") String date)
+            throws SQLException {
+
+        LocalDate reportDate = LocalDate.parse(date);
+
+        List<MovieTheatreReportResponse> report
+                = reportService.getMovieTheatreReport(
+                        reportDate,
+                        getAuthenticatedUserId()
+                );
+
+        return Response.ok(report).build();
+    }
+
+    @GET
     @Path("/theatre/pdf")
     @Produces("application/pdf")
     public Response generateTheatreReportPdf(
@@ -111,11 +149,7 @@ public class ReportResource {
 
         LocalDate reportDate = LocalDate.parse(date);
 
-        List<MovieReportResponse> reports
-                = reportService.getMovieReport(
-                        reportDate,
-                        getAuthenticatedUserId()
-                );
+        List<MovieReportResponse> reports = reportService.getMovieReport(reportDate, getAuthenticatedUserId());
 
         String filePath
                 = "D:/movie_booking/movie-report-" + date + ".pdf";
@@ -132,6 +166,69 @@ public class ReportResource {
                 .header(
                         "Content-Disposition",
                         "attachment; filename=\"movie-report-" + date + ".pdf\""
+                )
+                .build();
+    }
+
+    @GET
+    @Path("/overall/pdf")
+    @Produces("application/pdf")
+    public Response generateOverallReportPdf(@QueryParam("date") String date) throws Exception {
+
+        LocalDate reportDate = LocalDate.parse(date);
+
+        OverallReportResponse report = reportService.getOverallReport(reportDate, getAuthenticatedUserId());
+
+        String filePath
+                = "D:/movie_booking/overall-report-" + date + ".pdf";
+
+        PdfReportGenerator.generateOverallReportPdf(
+                filePath,
+                reportDate,
+                report
+        );
+
+        File file = new File(filePath);
+
+        return Response.ok(file)
+                .header(
+                        "Content-Disposition",
+                        "attachment; filename=\"overall-report-" + date + ".pdf\""
+                )
+                .build();
+    }
+
+    @GET
+    @Path("/movie_theatre/pdf")
+    @Produces("application/pdf")
+    public Response generateMovieTheatreReportPdf(
+            @QueryParam("date") String date) throws Exception {
+
+        LocalDate reportDate = LocalDate.parse(date);
+
+        List<MovieTheatreReportResponse> reports
+                = reportService.getMovieTheatreReport(
+                        reportDate,
+                        getAuthenticatedUserId()
+                );
+
+        String filePath
+                = "D:/movie_booking/movie-theatre-report-"
+                + date
+                + ".pdf";
+
+        PdfReportGenerator.generateMovieTheatreReport(
+                reports,
+                filePath
+        );
+
+        File file = new File(filePath);
+
+        return Response.ok(file)
+                .header(
+                        "Content-Disposition",
+                        "attachment; filename=\"movie-theatre-report-"
+                        + date + ".pdf\""
                 )
                 .build();
     }

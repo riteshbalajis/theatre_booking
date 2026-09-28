@@ -2247,6 +2247,7 @@ small {
 .card-bookings::before { background: #2563eb; }
 .card-seats::before { background: #d97706; }
 .card-entities::before { background: #0f766e; }
+.card-aov::before { background: #7c3aed; }
 
 .stat-card-top {
   display: flex;
@@ -2291,6 +2292,11 @@ small {
 .icon-entities {
   background: #ccfbf1;
   color: #0f766e;
+}
+
+.icon-aov {
+  background: #ede9fe;
+  color: #6d28d9;
 }
 
 .stat-value {

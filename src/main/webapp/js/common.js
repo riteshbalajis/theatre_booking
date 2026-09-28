@@ -109,6 +109,10 @@ function renderHeader() {
           <span class="dropdown-item-icon">🎬</span>
           <span class="dropdown-item-text">Manage Catalogue</span>
         </a>
+        <a href="admin.html#reports" class="dropdown-item" role="menuitem">
+          <span class="dropdown-item-icon">📊</span>
+          <span class="dropdown-item-text">Business Reports</span>
+        </a>
         <div class="dropdown-divider"></div>
         ` : ''}
         <a href="settings.html#profile" class="dropdown-item" role="menuitem">

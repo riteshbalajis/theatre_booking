@@ -2099,8 +2099,27 @@ const ADMIN_CONFIG = {
 async function loadAdmin() {
   if (!requireAdmin()) return;
   const tabs = qs('#admin-tabs');
-  tabs.addEventListener('click', event => { const tab = event.target.closest('[data-resource]'); if (!tab) return; tabs.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item === tab)); renderAdminResource(tab.dataset.resource); });
-  renderAdminResource('movies');
+  tabs.addEventListener('click', event => {
+    const tab = event.target.closest('[data-resource]');
+    if (!tab) return;
+    tabs.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item === tab));
+    const resource = tab.dataset.resource;
+    if (window.location.hash !== `#${resource}`) {
+      history.replaceState(null, '', `#${resource}`);
+    }
+    renderAdminResource(resource);
+  });
+
+  const hash = (window.location.hash || '').replace('#', '');
+  const initialResource = (hash && ['movies', 'theatres', 'screens', 'seats', 'shows', 'reports'].includes(hash))
+    ? hash
+    : 'movies';
+
+  const initialTab = tabs.querySelector(`[data-resource="${initialResource}"]`);
+  if (initialTab) {
+    tabs.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item === initialTab));
+  }
+  renderAdminResource(initialResource);
 }
 
 async function loadTicketCheckin() {
@@ -2322,6 +2341,9 @@ async function formMarkup(config, item = {}) {
 }
 
 async function renderAdminResource(resource) {
+  if (resource === 'reports') {
+    return renderAdminReports();
+  }
   const config = ADMIN_CONFIG[resource]; const workspace = qs('#admin-workspace'); const message = qs('#page-message');
   workspace.innerHTML = '<p class="muted">Loading resource...</p>';
   try { const items = resource === 'seats' ? await loadAllSeats() : await API.get(config.endpoint); const rows = items || []; workspace.innerHTML = `<div class="admin-toolbar"><h2>${config.title}</h2><button class="button button-small" data-new-resource>New ${config.title.slice(0, -1)}</button></div><div data-admin-form></div><table class="admin-table"><thead><tr>${config.columns.map(([, label]) => `<th>${label}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr>${config.columns.map(([key]) => { let cellVal = item[key]; if (key === 'startTime' || key === 'endTime') cellVal = formatTime(cellVal); else if (key === 'showDate' || key === 'releaseDate') cellVal = formatDate(cellVal); return `<td>${escapeHtml(cellVal)}</td>`; }).join('')}<td><div class="admin-actions"><button class="button button-small" data-edit="${item[config.id]}">Edit</button><button class="button button-small danger" data-delete="${item[config.id]}">Deactivate</button></div></td></tr>`).join('')}</tbody></table>`; workspace.querySelector('[data-new-resource]').addEventListener('click', () => openAdminForm(resource)); workspace.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openAdminForm(resource, rows.find(item => String(item[config.id]) === button.dataset.edit)))); workspace.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deactivateResource(resource, button.dataset.delete))); setMessage(message, rows.length ? '' : `No ${config.title.toLowerCase()} found.`); } catch (error) { setMessage(message, error.message, 'error'); workspace.innerHTML = ''; }
@@ -2342,3 +2364,335 @@ async function openAdminForm(resource, item = null) {
 }
 
 async function deactivateResource(resource, id) { if (!window.confirm('Deactivate this resource?')) return; const config = ADMIN_CONFIG[resource]; try { await API.remove(`${config.endpoint}/${id}`); await renderAdminResource(resource); } catch (error) { setMessage(qs('#page-message'), error.message, 'error'); } }
+
+async function renderAdminReports() {
+  const workspace = qs('#admin-workspace');
+  const pageMessage = qs('#page-message');
+  setMessage(pageMessage, '');
+
+  const today = todayIso();
+
+  workspace.innerHTML = `
+    <div class="reports-dashboard">
+      <div class="admin-toolbar" style="margin-bottom: 24px;">
+        <div>
+          <h2 style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.5rem;">📊</span> Reports & Analytics
+          </h2>
+          <p class="muted" style="margin: 4px 0 0; font-size: 0.95rem;">
+            Generate and download business performance reports by theatre or movie for any date.
+          </p>
+        </div>
+      </div>
+
+      <div class="report-card report-controls-card">
+        <form id="report-controls-form" class="report-controls-form">
+          <div class="report-control-group">
+            <label for="report-type-select" class="report-label">
+              <span>📋</span> Report Type
+            </label>
+            <div class="report-select-wrapper">
+              <select id="report-type-select" name="reportType" class="report-input-field report-select">
+                <option value="theatre" selected>Theatre Report (Venue Performance)</option>
+                <option value="movie">Movie Report (Box Office Performance)</option>
+              </select>
+            </div>
+            <span class="report-hint">Aggregated booking & revenue data by theatre or movie</span>
+          </div>
+
+          <div class="report-control-group">
+            <label for="report-date-input" class="report-label">
+              <span>📅</span> Target Date
+            </label>
+            <div class="report-date-container">
+              <input type="date" id="report-date-input" name="reportDate" class="report-input-field" value="${today}" max="${today}" required>
+              <button type="button" id="btn-report-today" class="button button-small button-light report-today-btn" title="Reset date to today">Today</button>
+            </div>
+            <span class="report-hint">Select today or any past date (up to ${today})</span>
+          </div>
+
+          <div class="report-button-group">
+            <button type="button" id="btn-preview-data" class="button button-light report-btn" title="Refresh live preview table">
+              <span>👁️</span> Refresh Preview
+            </button>
+            <button type="submit" id="btn-download-pdf" class="button report-btn report-download-btn" title="Download official PDF report">
+              <span class="download-icon">📥</span>
+              <span class="btn-text">Download Report (PDF)</span>
+            </button>
+          </div>
+        </form>
+        <div id="report-form-message" class="message" role="status" style="margin-top: 16px; display: none;"></div>
+      </div>
+
+      <div id="report-loading" class="report-loading-container" style="display: none;">
+        <div class="report-spinner"></div>
+        <p class="muted" style="margin: 12px 0 0; font-weight: 600;">Loading report metrics...</p>
+      </div>
+
+      <div id="report-results-view" class="report-results-view" style="margin-top: 28px;"></div>
+    </div>
+  `;
+
+  const form = qs('#report-controls-form', workspace);
+  const typeSelect = qs('#report-type-select', workspace);
+  const dateInput = qs('#report-date-input', workspace);
+  const todayBtn = qs('#btn-report-today', workspace);
+  const previewBtn = qs('#btn-preview-data', workspace);
+  const downloadBtn = qs('#btn-download-pdf', workspace);
+  const statusMsg = qs('#report-form-message', workspace);
+  const loadingEl = qs('#report-loading', workspace);
+  const resultsView = qs('#report-results-view', workspace);
+
+  function setStatus(text, type = '') {
+    if (!text) {
+      statusMsg.style.display = 'none';
+      statusMsg.textContent = '';
+      statusMsg.className = 'message';
+      return;
+    }
+    statusMsg.style.display = 'block';
+    statusMsg.textContent = text;
+    statusMsg.className = `message ${type}`.trim();
+  }
+
+  // Today shortcut
+  todayBtn.addEventListener('click', () => {
+    dateInput.value = todayIso();
+    loadPreview();
+  });
+
+  // Automatically update preview on type or date changes
+  typeSelect.addEventListener('change', () => loadPreview());
+  dateInput.addEventListener('change', () => loadPreview());
+  previewBtn.addEventListener('click', () => loadPreview());
+
+  // Form submit handles PDF Download
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await triggerPdfDownload();
+  });
+
+  async function triggerPdfDownload() {
+    const reportType = typeSelect.value;
+    const date = dateInput.value;
+
+    if (!date) {
+      setStatus('Please select a date for the report.', 'error');
+      return;
+    }
+    if (date > todayIso()) {
+      setStatus('Report date cannot be in the future.', 'error');
+      return;
+    }
+
+    const originalHtml = downloadBtn.innerHTML;
+    downloadBtn.disabled = true;
+    downloadBtn.innerHTML = '<span class="report-spinner-small"></span> Downloading...';
+    setStatus('Generating and downloading PDF report...', 'info');
+
+    try {
+      const downloadPath = `${API_CONTEXT_PATH}/api/reports/${reportType}/pdf?date=${encodeURIComponent(date)}`;
+      const response = await fetch(downloadPath, {
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) {
+        let errMessage = `Download failed (${response.status})`;
+        try {
+          const json = await response.json();
+          if (json && json.message) errMessage = json.message;
+        } catch (_) {
+          const text = await response.text();
+          if (text) errMessage = text;
+        }
+        throw new Error(errMessage);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const tempA = document.createElement('a');
+      tempA.href = blobUrl;
+      const fileName = `${reportType}-report-${date}.pdf`;
+      tempA.download = fileName;
+      document.body.appendChild(tempA);
+      tempA.click();
+      tempA.remove();
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+
+      setStatus(`✓ ${reportType === 'theatre' ? 'Theatre' : 'Movie'} report for ${formatDate(date)} downloaded successfully!`, 'success');
+    } catch (error) {
+      setStatus(error.message || 'Failed to download PDF report.', 'error');
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.innerHTML = originalHtml;
+    }
+  }
+
+  async function loadPreview() {
+    const reportType = typeSelect.value;
+    const date = dateInput.value;
+
+    if (!date) {
+      resultsView.innerHTML = '';
+      return;
+    }
+
+    if (date > todayIso()) {
+      setStatus('Report date cannot be in the future.', 'error');
+      resultsView.innerHTML = '';
+      return;
+    }
+
+    setStatus('');
+    loadingEl.style.display = 'block';
+    resultsView.innerHTML = '';
+
+    try {
+      const data = await API.get(`/api/reports/${reportType}?date=${encodeURIComponent(date)}`);
+      loadingEl.style.display = 'none';
+      renderPreview(reportType, date, data || []);
+    } catch (error) {
+      loadingEl.style.display = 'none';
+      resultsView.innerHTML = `
+        <div class="report-card report-empty-state">
+          <div class="report-empty-icon">⚠️</div>
+          <h3>Failed to load report</h3>
+          <p class="muted" style="max-width: 480px; margin: 8px auto;">${escapeHtml(error.message || 'Error occurred while loading report preview.')}</p>
+        </div>
+      `;
+    }
+  }
+
+  function renderPreview(reportType, date, items) {
+    const isTheatre = reportType === 'theatre';
+    const reportTitle = isTheatre ? 'Theatre Performance' : 'Movie Box Office Performance';
+    const entityLabel = isTheatre ? 'Theatres' : 'Movies';
+
+    let totalRevenue = 0;
+    let totalBookings = 0;
+    let totalSeats = 0;
+
+    items.forEach(item => {
+      totalRevenue += Number(item.totalRevenue || 0);
+      totalBookings += Number(item.totalBookings || 0);
+      totalSeats += Number(item.seatsSold || 0);
+    });
+
+    const formattedDate = formatDate(date);
+
+    if (!items.length) {
+      resultsView.innerHTML = `
+        <div class="report-card report-empty-state">
+          <div class="report-empty-icon">📁</div>
+          <h3>No Records Found for ${formattedDate}</h3>
+          <p class="muted" style="max-width: 500px; margin: 8px auto 18px;">
+            There are no finalized bookings or revenue records recorded for ${isTheatre ? 'theatres' : 'movies'} on ${formattedDate}.
+          </p>
+          <div style="display: flex; gap: 10px; justify-content: center;">
+            <button type="button" class="button button-small" id="btn-empty-pdf">Download Report PDF Anyway</button>
+          </div>
+        </div>
+      `;
+      const emptyBtn = qs('#btn-empty-pdf', resultsView);
+      if (emptyBtn) emptyBtn.addEventListener('click', triggerPdfDownload);
+      return;
+    }
+
+    resultsView.innerHTML = `
+      <div class="report-stats-grid">
+        <div class="report-stat-card card-revenue">
+          <div class="stat-card-top">
+            <span class="stat-label">Total Revenue</span>
+            <span class="stat-icon-wrap icon-revenue">₹</span>
+          </div>
+          <div class="stat-value">₹${formatMoney(totalRevenue)}</div>
+          <div class="stat-footnote">Gross revenue collected for ${formattedDate}</div>
+        </div>
+
+        <div class="report-stat-card card-bookings">
+          <div class="stat-card-top">
+            <span class="stat-label">Total Bookings</span>
+            <span class="stat-icon-wrap icon-bookings">🎟️</span>
+          </div>
+          <div class="stat-value">${totalBookings.toLocaleString()}</div>
+          <div class="stat-footnote">Completed customer transactions</div>
+        </div>
+
+        <div class="report-stat-card card-seats">
+          <div class="stat-card-top">
+            <span class="stat-label">Seats Sold</span>
+            <span class="stat-icon-wrap icon-seats">🪑</span>
+          </div>
+          <div class="stat-value">${totalSeats.toLocaleString()}</div>
+          <div class="stat-footnote">Admissions booked across shows</div>
+        </div>
+
+        <div class="report-stat-card card-entities">
+          <div class="stat-card-top">
+            <span class="stat-label">Active ${entityLabel}</span>
+            <span class="stat-icon-wrap icon-entities">${isTheatre ? '🏢' : '🎬'}</span>
+          </div>
+          <div class="stat-value">${items.length}</div>
+          <div class="stat-footnote">${entityLabel} with sales activity</div>
+        </div>
+      </div>
+
+      <div class="report-card report-table-card">
+        <div class="report-table-header">
+          <div>
+            <span class="eyebrow" style="font-size: 0.72rem;">Live Summary &middot; ${formattedDate}</span>
+            <h3 style="margin: 3px 0 0; font-size: 1.25rem;">${reportTitle}</h3>
+          </div>
+          <button type="button" id="btn-table-pdf" class="button button-small" style="display: inline-flex; align-items: center; gap: 6px;">
+            <span>📥</span> Download PDF
+          </button>
+        </div>
+
+        <div class="report-table-scroll">
+          <table class="admin-table report-custom-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>${isTheatre ? 'Theatre Name' : 'Movie Title'}</th>
+                <th style="text-align: right;">Total Bookings</th>
+                <th style="text-align: right;">Seats Sold</th>
+                <th style="text-align: right;">Total Revenue (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map((row, index) => {
+                const name = isTheatre
+                  ? (row.theatreName || `Theatre #${row.theatreId}`)
+                  : (row.movieTitle || `Movie #${row.movieId}`);
+                return `
+                  <tr>
+                    <td class="report-col-idx">${index + 1}</td>
+                    <td class="report-col-name"><strong>${escapeHtml(name)}</strong></td>
+                    <td style="text-align: right;"><span class="badge-num">${Number(row.totalBookings || 0).toLocaleString()}</span></td>
+                    <td style="text-align: right;"><span class="badge-num">${Number(row.seatsSold || 0).toLocaleString()}</span></td>
+                    <td style="text-align: right;" class="report-col-revenue">₹${formatMoney(row.totalRevenue)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr class="report-total-row">
+                <td colspan="2" style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85rem;">Grand Total</td>
+                <td style="text-align: right; font-weight: 700;">${totalBookings.toLocaleString()}</td>
+                <td style="text-align: right; font-weight: 700;">${totalSeats.toLocaleString()}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--teal-dark); font-size: 1.05rem;">₹${formatMoney(totalRevenue)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+
+    const tablePdfBtn = qs('#btn-table-pdf', resultsView);
+    if (tablePdfBtn) tablePdfBtn.addEventListener('click', triggerPdfDownload);
+  }
+
+  // Load preview immediately
+  loadPreview();
+}
+

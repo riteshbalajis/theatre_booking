@@ -1,5 +1,7 @@
 package com.movie_booking.service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
@@ -114,12 +116,10 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
-    public void generateDailyReportPdf(
+    public ByteArrayOutputStream generateDailyReportPdf(
             LocalDate date,
-            int authenticatedUserId,
-            String filePath) throws Exception {
+            int authenticatedUserId) throws Exception {
 
-        // Authorization
         requireAdmin(authenticatedUserId);
 
         if (date == null) {
@@ -127,13 +127,11 @@ public class ReportServiceImpl implements ReportService {
                     "Report date cannot be null."
             );
         }
-        generateDailyReportPdf(date, filePath);
+        return generateDailyReportPdf(date);
     }
 
     @Override
-    public void generateDailyReportPdf(LocalDate date,String filePath) throws Exception {
-
-        //requireAdmin(authenticatedUserId);
+    public ByteArrayOutputStream generateDailyReportPdf(LocalDate date) throws Exception {
 
         System.out.println("Generating report for: " + date);
 
@@ -149,15 +147,42 @@ public class ReportServiceImpl implements ReportService {
         List<MovieTheatreReportResponse> movieTheatreReports
                 = ReportDao.getMovieTheatreReport(date);
 
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         PdfReportGenerator.generateDailyReportPdf(
-                filePath,
+                baos,
                 date,
                 overallReport,
                 movieReports,
                 theatreReports,
                 movieTheatreReports
         );
+
+        return baos;
+    }
+
+    @Override
+    public void generateDailyReportPdf(
+            LocalDate date,
+            int authenticatedUserId,
+            String filePath) throws Exception {
+
+        requireAdmin(authenticatedUserId);
+
+        if (date == null) {
+            throw new IllegalArgumentException(
+                    "Report date cannot be null."
+            );
+        }
+        generateDailyReportPdf(date, filePath);
+    }
+
+    @Override
+    public void generateDailyReportPdf(LocalDate date, String filePath) throws Exception {
+        ByteArrayOutputStream baos = generateDailyReportPdf(date);
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            baos.writeTo(fos);
+        }
     }
 
     private void requireAdmin(int authenticatedUserId)

@@ -1,5 +1,6 @@
 package com.movie_booking.service;
 
+import java.io.ByteArrayOutputStream;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
@@ -8,7 +9,6 @@ import com.movie_booking.dto.response.MovieReportResponse;
 import com.movie_booking.dto.response.MovieTheatreReportResponse;
 import com.movie_booking.dto.response.OverallReportResponse;
 import com.movie_booking.dto.response.TheatreReportResponse;
-
 
 public interface ReportService {
 
@@ -25,5 +25,7 @@ public interface ReportService {
 
     public void generateDailyReportPdf(LocalDate date,String filePath) throws Exception;
 
- 
-}
+    ByteArrayOutputStream generateDailyReportPdf(LocalDate date, int authenticatedUserId) throws Exception;
+
+    ByteArrayOutputStream generateDailyReportPdf(LocalDate date) throws Exception;
+}

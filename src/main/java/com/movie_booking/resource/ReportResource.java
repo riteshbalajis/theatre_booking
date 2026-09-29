@@ -1,6 +1,6 @@
 package com.movie_booking.resource;
 
-import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
@@ -122,18 +122,15 @@ public class ReportResource {
                         getAuthenticatedUserId()
                 );
 
-        String filePath
-                = "D:/movie_booking/theatre-report-" + date + ".pdf";
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         PdfReportGenerator.generateTheatreReportPdf(
-                filePath,
+                baos,
                 reportDate,
                 reports
         );
 
-        File file = new File(filePath);
-
-        return Response.ok(file)
+        return Response.ok(baos.toByteArray())
                 .header(
                         "Content-Disposition",
                         "attachment; filename=\"theatre-report-" + date + ".pdf\""
@@ -151,18 +148,15 @@ public class ReportResource {
 
         List<MovieReportResponse> reports = reportService.getMovieReport(reportDate, getAuthenticatedUserId());
 
-        String filePath
-                = "D:/movie_booking/movie-report-" + date + ".pdf";
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         PdfReportGenerator.generateMovieReportPdf(
-                filePath,
+                baos,
                 reportDate,
                 reports
         );
 
-        File file = new File(filePath);
-
-        return Response.ok(file)
+        return Response.ok(baos.toByteArray())
                 .header(
                         "Content-Disposition",
                         "attachment; filename=\"movie-report-" + date + ".pdf\""
@@ -179,18 +173,15 @@ public class ReportResource {
 
         OverallReportResponse report = reportService.getOverallReport(reportDate, getAuthenticatedUserId());
 
-        String filePath
-                = "D:/movie_booking/overall-report-" + date + ".pdf";
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         PdfReportGenerator.generateOverallReportPdf(
-                filePath,
+                baos,
                 reportDate,
                 report
         );
 
-        File file = new File(filePath);
-
-        return Response.ok(file)
+        return Response.ok(baos.toByteArray())
                 .header(
                         "Content-Disposition",
                         "attachment; filename=\"overall-report-" + date + ".pdf\""
@@ -212,19 +203,14 @@ public class ReportResource {
                         getAuthenticatedUserId()
                 );
 
-        String filePath
-                = "D:/movie_booking/movie-theatre-report-"
-                + date
-                + ".pdf";
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         PdfReportGenerator.generateMovieTheatreReport(
                 reports,
-                filePath
+                baos
         );
 
-        File file = new File(filePath);
-
-        return Response.ok(file)
+        return Response.ok(baos.toByteArray())
                 .header(
                         "Content-Disposition",
                         "attachment; filename=\"movie-theatre-report-"
@@ -241,19 +227,12 @@ public class ReportResource {
             throws Exception {
 
         int userId = getAuthenticatedUserId();
+        LocalDate reportDate = LocalDate.parse(date);
 
-        String filePath
-                = "D:/movie_booking/daily-report-" + date + ".pdf";
+        ByteArrayOutputStream baos
+                = reportService.generateDailyReportPdf(reportDate, userId);
 
-        reportService.generateDailyReportPdf(
-                LocalDate.parse(date),
-                userId,
-                filePath
-        );
-
-        File file = new File(filePath);
-
-        return Response.ok(file)
+        return Response.ok(baos.toByteArray())
                 .header(
                         "Content-Disposition",
                         "attachment; filename=\"daily-report-"

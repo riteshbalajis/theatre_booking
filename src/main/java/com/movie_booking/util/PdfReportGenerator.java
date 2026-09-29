@@ -1,6 +1,7 @@
 package com.movie_booking.util;
 
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -27,14 +28,14 @@ public final class PdfReportGenerator {
     // =========================================================
     // COMMON PDF METHODS
     // =========================================================
-    private static Document createDocument(String filePath)
+    private static Document createDocument(OutputStream outputStream)
             throws Exception {
 
         Document document = new Document();
 
         PdfWriter.getInstance(
                 document,
-                new FileOutputStream(filePath)
+                outputStream
         );
 
         document.open();
@@ -97,12 +98,12 @@ public final class PdfReportGenerator {
     // 1. THEATRE REPORT
     // =========================================================
     public static void generateTheatreReportPdf(
-            String filePath,
+            OutputStream outputStream,
             LocalDate date,
             List<TheatreReportResponse> reports)
             throws Exception {
 
-        Document document = createDocument(filePath);
+        Document document = createDocument(outputStream);
 
         addTitle(
                 document,
@@ -138,16 +139,27 @@ public final class PdfReportGenerator {
         document.close();
     }
 
+    public static void generateTheatreReportPdf(
+            String filePath,
+            LocalDate date,
+            List<TheatreReportResponse> reports)
+            throws Exception {
+
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            generateTheatreReportPdf(fos, date, reports);
+        }
+    }
+
     // =========================================================
     // 2. MOVIE REPORT
     // =========================================================
     public static void generateMovieReportPdf(
-            String filePath,
+            OutputStream outputStream,
             LocalDate date,
             List<MovieReportResponse> reports)
             throws Exception {
 
-        Document document = createDocument(filePath);
+        Document document = createDocument(outputStream);
 
         addTitle(
                 document,
@@ -183,16 +195,27 @@ public final class PdfReportGenerator {
         document.close();
     }
 
+    public static void generateMovieReportPdf(
+            String filePath,
+            LocalDate date,
+            List<MovieReportResponse> reports)
+            throws Exception {
+
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            generateMovieReportPdf(fos, date, reports);
+        }
+    }
+
     // =========================================================
     // 3. OVERALL DAILY REPORT
     // =========================================================
     public static void generateOverallReportPdf(
-            String filePath,
+            OutputStream outputStream,
             LocalDate date,
             OverallReportResponse report)
             throws Exception {
 
-        Document document = createDocument(filePath);
+        Document document = createDocument(outputStream);
 
         addTitle(
                 document,
@@ -232,15 +255,26 @@ public final class PdfReportGenerator {
         document.close();
     }
 
+    public static void generateOverallReportPdf(
+            String filePath,
+            LocalDate date,
+            OverallReportResponse report)
+            throws Exception {
+
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            generateOverallReportPdf(fos, date, report);
+        }
+    }
+
     // =========================================================
     // 4. MOVIE + THEATRE REPORT
     // =========================================================
     public static void generateMovieTheatreReport(
             List<MovieTheatreReportResponse> reports,
-            String filePath)
+            OutputStream outputStream)
             throws Exception {
 
-        Document document = createDocument(filePath);
+        Document document = createDocument(outputStream);
 
         LocalDate date = LocalDate.now();
 
@@ -281,8 +315,18 @@ public final class PdfReportGenerator {
         document.close();
     }
 
+    public static void generateMovieTheatreReport(
+            List<MovieTheatreReportResponse> reports,
+            String filePath)
+            throws Exception {
+
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            generateMovieTheatreReport(reports, fos);
+        }
+    }
+
     public static void generateDailyReportPdf(
-            String filePath,
+            OutputStream outputStream,
             LocalDate date,
             OverallReportResponse overallReport,
             List<MovieReportResponse> movieReports,
@@ -291,7 +335,7 @@ public final class PdfReportGenerator {
             throws Exception {
 
         // Create ONE PDF document
-        Document document = createDocument(filePath);
+        Document document = createDocument(outputStream);
 
         // =====================================================
         // MAIN TITLE
@@ -499,4 +543,26 @@ public final class PdfReportGenerator {
         // =====================================================
         document.close();
     }
+
+    public static void generateDailyReportPdf(
+            String filePath,
+            LocalDate date,
+            OverallReportResponse overallReport,
+            List<MovieReportResponse> movieReports,
+            List<TheatreReportResponse> theatreReports,
+            List<MovieTheatreReportResponse> movieTheatreReports)
+            throws Exception {
+
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            generateDailyReportPdf(
+                    fos,
+                    date,
+                    overallReport,
+                    movieReports,
+                    theatreReports,
+                    movieTheatreReports
+            );
+        }
+    }
 }
+

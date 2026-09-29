@@ -119,8 +119,6 @@ public class UserServiceImpl implements UserService {
         return new LoginResponse(toUserResponse(user), "Login successful.");
     }
 
-    
-
     @Override
     public boolean forgotPassword(String email) throws SQLException {
 
@@ -584,6 +582,11 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Role and status cannot be null.");
         }
         return toUserResponses(userDao.findByRoleAndStatus(role, status));
+    }
+
+    @Override
+    public List<String> findAdminEmails() throws SQLException {
+        return userDao.findAdminEmails();
     }
 
     @Override

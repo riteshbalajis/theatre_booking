@@ -55,6 +55,8 @@ public interface UserDao {
 
     boolean regenerateTotpSecret(int userId,String newSecret) throws SQLException;
 
+    List<String> findAdminEmails() throws SQLException;
+
 
 
 

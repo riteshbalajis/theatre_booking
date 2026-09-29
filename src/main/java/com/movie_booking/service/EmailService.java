@@ -1,15 +1,20 @@
 package com.movie_booking.service;
 
+import java.io.File;
+import java.time.LocalDate;
 import java.util.Properties;
 
 import javax.mail.Authenticator;
 import javax.mail.Message;
 import javax.mail.MessagingException;
+import javax.mail.Multipart;
 import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
 
 import com.movie_booking.config.MailConfig;
 
@@ -39,43 +44,43 @@ public class EmailService {
         sendEmail(recipient, subject, body);
     }
 
-        public void sendTotpRecoveryOtp(String recipient, String otp) {
+    public void sendTotpRecoveryOtp(String recipient, String otp) {
 
-                String subject = "Screenly - Authenticator Recovery Code";
+        String subject = "Screenly - Authenticator Recovery Code";
 
-                String body
-                                = "Hello,\n\n"
-                                + "We received a request to recover access to your Screenly "
-                                + "authenticator.\n\n"
-                                + "Your authenticator recovery code is: " + otp + "\n\n"
-                                + "This code will expire in 5 minutes and can be used only once.\n\n"
-                                + "If you did not request authenticator recovery, please secure "
-                                + "your account and contact support.\n\n"
-                                + "Regards,\n"
-                                + "Screenly Team";
+        String body
+                = "Hello,\n\n"
+                + "We received a request to recover access to your Screenly "
+                + "authenticator.\n\n"
+                + "Your authenticator recovery code is: " + otp + "\n\n"
+                + "This code will expire in 5 minutes and can be used only once.\n\n"
+                + "If you did not request authenticator recovery, please secure "
+                + "your account and contact support.\n\n"
+                + "Regards,\n"
+                + "Screenly Team";
 
-                sendEmail(recipient, subject, body);
-        }
+        sendEmail(recipient, subject, body);
+    }
 
-        public void sendRegistrationVerificationOtp(
-                        String recipient,
-                        String name,
-                        String otp) {
+    public void sendRegistrationVerificationOtp(
+            String recipient,
+            String name,
+            String otp) {
 
-                String subject = "Screenly - Verify Your Email";
+        String subject = "Screenly - Verify Your Email";
 
-                String body
-                                = "Hello " + name + ",\n\n"
-                                + "Thank you for registering with Screenly.\n\n"
-                                + "Your email verification code is: " + otp + "\n\n"
-                                + "This code will expire in 5 minutes and can be used only once.\n\n"
-                                + "If you did not create this registration request, please ignore "
-                                + "this email.\n\n"
-                                + "Regards,\n"
-                                + "Screenly Team";
+        String body
+                = "Hello " + name + ",\n\n"
+                + "Thank you for registering with Screenly.\n\n"
+                + "Your email verification code is: " + otp + "\n\n"
+                + "This code will expire in 5 minutes and can be used only once.\n\n"
+                + "If you did not create this registration request, please ignore "
+                + "this email.\n\n"
+                + "Regards,\n"
+                + "Screenly Team";
 
-                sendEmail(recipient, subject, body);
-        }
+        sendEmail(recipient, subject, body);
+    }
 
     public void sendWelcomeEmail(String recipient, String name) {
 
@@ -134,6 +139,35 @@ public class EmailService {
                 + "Screenly Team";
 
         sendEmail(recipient, subject, body);
+    }
+
+    public void sendDailyReportEmail(
+            String recipient,
+            LocalDate reportDate,
+            String pdfFilePath) {
+
+        String subject
+                = "Screenly - Daily Booking Report | "
+                + reportDate;
+
+        String body
+                = "Hello,\n\n"
+                + "Please find attached the daily movie booking report "
+                + "for " + reportDate + ".\n\n"
+                + "The report contains:\n"
+                + "- Overall booking summary\n"
+                + "- Movie-wise report\n"
+                + "- Theatre-wise report\n"
+                + "- Movie-theatre-wise report\n\n"
+                + "Regards,\n"
+                + "Screenly Team";
+
+        sendEmailWithAttachment(
+                recipient,
+                subject,
+                body,
+                pdfFilePath
+        );
     }
 
     private void sendEmail(
@@ -199,6 +233,106 @@ public class EmailService {
 
             throw new RuntimeException(
                     "Failed to send email.",
+                    e
+            );
+        }
+    }
+
+    private void sendEmailWithAttachment(
+            String recipient,
+            String subject,
+            String body,
+            String filePath) {
+
+
+        System.out.println(">>> MAIL USERNAME = " + username);
+        System.out.println(">>> RECIPIENT = " + recipient);
+        
+
+        Properties properties = new Properties();
+
+        properties.put("mail.smtp.host", "smtp.gmail.com");
+        properties.put("mail.smtp.port", "587");
+        properties.put("mail.smtp.auth", "true");
+        properties.put("mail.smtp.starttls.enable", "true");
+
+        Session session = Session.getInstance(
+                properties,
+                new Authenticator() {
+
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+
+                return new PasswordAuthentication(
+                        username,
+                        password
+                );
+            }
+        });
+
+        try {
+
+            Message message = new MimeMessage(session);
+
+            message.setFrom(
+                    new InternetAddress(username)
+            );
+
+            message.setRecipients(
+                    Message.RecipientType.TO,
+                    InternetAddress.parse(recipient)
+            );
+
+            message.setSubject(subject);
+
+            // ==========================================
+            // BODY + ATTACHMENT
+            // ==========================================
+            MimeBodyPart textPart
+                    = new MimeBodyPart();
+
+            textPart.setText(body);
+
+            // ==========================================
+            // PDF ATTACHMENT
+            // ==========================================
+            MimeBodyPart attachmentPart
+                    = new MimeBodyPart();
+
+            attachmentPart.attachFile(
+                    new File(filePath)
+            );
+
+            // ==========================================
+            // COMBINE BODY + PDF
+            // ==========================================
+            Multipart multipart
+                    = new MimeMultipart();
+
+            multipart.addBodyPart(textPart);
+            multipart.addBodyPart(attachmentPart);
+
+            message.setContent(multipart);
+
+            // ==========================================
+            // SEND
+            // ==========================================
+            Transport.send(message);
+
+            System.out.println(
+                    ">>> DAILY REPORT EMAIL SENT SUCCESSFULLY"
+            );
+
+        } catch (Exception e) {
+
+            System.out.println(
+                    ">>> DAILY REPORT EMAIL FAILED"
+            );
+
+            e.printStackTrace();
+
+            throw new RuntimeException(
+                    "Failed to send daily report email.",
                     e
             );
         }

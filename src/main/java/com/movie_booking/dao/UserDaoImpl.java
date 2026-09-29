@@ -352,6 +352,30 @@ public class UserDaoImpl implements UserDao {
         }
     }
 
+    @Override
+    public List<String> findAdminEmails() throws SQLException {
+
+        String sql
+                = "SELECT email "
+                + "FROM users "
+                + "WHERE role = 'ADMIN' "
+                + "AND status = 'ACTIVE'";
+
+        List<String> emails = new ArrayList<>();
+
+        try (
+                Connection connection = DBConnection.getConnection(); PreparedStatement statement
+                = connection.prepareStatement(sql); ResultSet resultSet
+                = statement.executeQuery()) {
+
+            while (resultSet.next()) {
+                emails.add(resultSet.getString("email"));
+            }
+        }
+
+        return emails;
+    }
+
     private List<User> readUsers(PreparedStatement statement) throws SQLException {
         List<User> users = new ArrayList<>();
         try (ResultSet resultSet = statement.executeQuery()) {

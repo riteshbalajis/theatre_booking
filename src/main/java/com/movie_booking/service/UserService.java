@@ -52,5 +52,7 @@ public interface UserService {
 
     boolean resetPassword(String email,String resetToken,String newPassword) throws SQLException;
 
+    List<String> findAdminEmails() throws SQLException;
+
     
 }

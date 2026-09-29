@@ -20,4 +20,10 @@ public interface ReportService {
     OverallReportResponse getOverallReport(LocalDate date,int authenticatedUserId) throws SQLException;
 
     List<MovieTheatreReportResponse> getMovieTheatreReport(LocalDate date,int authenticatedUserId) throws SQLException;
+
+    public void generateDailyReportPdf(LocalDate date,int authenticatedUserId,String filePath) throws Exception;
+
+    public void generateDailyReportPdf(LocalDate date,String filePath) throws Exception;
+
+ 
 }

@@ -67,8 +67,7 @@ async function getAllMoviesCategorized(keyword = '') {
   const path = keyword ? `/api/movies?keyword=${encodeURIComponent(keyword)}` : '/api/movies';
   const movies = await API.get(path) || [];
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  const today = todayIso();
 
   const activeMovies = [];
   const upcomingMovies = [];
@@ -77,8 +76,14 @@ async function getAllMoviesCategorized(keyword = '') {
     const isExplicitUpcoming = movie.status === 'UPCOMING';
     let isFutureRelease = false;
     if (movie.releaseDate) {
-      const relDate = new Date(movie.releaseDate);
-      if (!isNaN(relDate.getTime()) && relDate > now) {
+      let relDateStr = '';
+      if (Array.isArray(movie.releaseDate)) {
+        const [y, m, d] = movie.releaseDate;
+        relDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      } else {
+        relDateStr = String(movie.releaseDate).trim().slice(0, 10);
+      }
+      if (relDateStr && relDateStr > today) {
         isFutureRelease = true;
       }
     }
@@ -1538,7 +1543,16 @@ async function loadDetails() {
   dateInput.value = todayIso();
   try {
     const movie = await API.get(`/api/movies/${id}`);
-    const isUpcoming = movie.status === 'UPCOMING';
+    const today = todayIso();
+    let relDateStr = '';
+    if (Array.isArray(movie.releaseDate)) {
+      const [y, m, d] = movie.releaseDate;
+      relDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    } else if (movie.releaseDate) {
+      relDateStr = String(movie.releaseDate).trim().slice(0, 10);
+    }
+    const isFutureRelease = Boolean(relDateStr && relDateStr > today);
+    const isUpcoming = movie.status === 'UPCOMING' || isFutureRelease;
     const releaseDateStr = movie.releaseDate ? formatDate(movie.releaseDate) : '';
 
     detail.innerHTML = `<div class="detail-poster" style="position: relative;">

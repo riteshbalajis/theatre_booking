@@ -15,24 +15,26 @@ import com.movie_booking.dto.response.TheatreReportResponse;
 import com.movie_booking.model.User;
 import com.movie_booking.model.UserRole;
 import com.movie_booking.model.UserStatus;
+import com.movie_booking.util.PdfReportGenerator;
+
 
 public class ReportServiceImpl implements ReportService {
 
-    private final ReportDao reportDao;
+    private final ReportDao ReportDao;
     private final UserDao userDao;
 
     public ReportServiceImpl() {
         this(new ReportDaoImpl(), new UserDaoImpl());
     }
 
-    public ReportServiceImpl(ReportDao reportDao, UserDao userDao) {
-        if (reportDao == null || userDao == null) {
+    public ReportServiceImpl(ReportDao ReportDao, UserDao userDao) {
+        if (ReportDao == null || userDao == null) {
             throw new IllegalArgumentException(
                     "Report and user DAOs cannot be null."
             );
         }
 
-        this.reportDao = reportDao;
+        this.ReportDao = ReportDao;
         this.userDao = userDao;
     }
 
@@ -55,7 +57,7 @@ public class ReportServiceImpl implements ReportService {
             );
         }
 
-        return reportDao.getTheatreReport(date);
+        return ReportDao.getTheatreReport(date);
     }
 
     @Override
@@ -77,7 +79,7 @@ public class ReportServiceImpl implements ReportService {
             );
         }
 
-        return reportDao.getMovieReport(date);
+        return ReportDao.getMovieReport(date);
     }
 
     @Override
@@ -92,7 +94,7 @@ public class ReportServiceImpl implements ReportService {
             throw new IllegalArgumentException("Report date cannot be null.");
         }
 
-        return reportDao.getOverallReport(date);
+        return ReportDao.getOverallReport(date);
     }
 
     @Override
@@ -108,7 +110,54 @@ public class ReportServiceImpl implements ReportService {
             );
         }
 
-        return reportDao.getMovieTheatreReport(date);
+        return ReportDao.getMovieTheatreReport(date);
+    }
+
+    @Override
+    public void generateDailyReportPdf(
+            LocalDate date,
+            int authenticatedUserId,
+            String filePath) throws Exception {
+
+        // Authorization
+        requireAdmin(authenticatedUserId);
+
+        if (date == null) {
+            throw new IllegalArgumentException(
+                    "Report date cannot be null."
+            );
+        }
+        generateDailyReportPdf(date, filePath);
+    }
+
+    @Override
+    public void generateDailyReportPdf(LocalDate date,String filePath) throws Exception {
+
+        //requireAdmin(authenticatedUserId);
+
+        System.out.println("Generating report for: " + date);
+
+        OverallReportResponse overallReport
+                = ReportDao.getOverallReport(date);
+
+        List<MovieReportResponse> movieReports
+                = ReportDao.getMovieReport(date);
+
+        List<TheatreReportResponse> theatreReports
+                = ReportDao.getTheatreReport(date);
+
+        List<MovieTheatreReportResponse> movieTheatreReports
+                = ReportDao.getMovieTheatreReport(date);
+
+
+        PdfReportGenerator.generateDailyReportPdf(
+                filePath,
+                date,
+                overallReport,
+                movieReports,
+                theatreReports,
+                movieTheatreReports
+        );
     }
 
     private void requireAdmin(int authenticatedUserId)

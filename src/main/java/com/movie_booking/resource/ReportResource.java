@@ -233,6 +233,35 @@ public class ReportResource {
                 .build();
     }
 
+    @GET
+    @Path("/daily/pdf")
+    @Produces("application/pdf")
+    public Response generateDailyPdf(
+            @QueryParam("date") String date)
+            throws Exception {
+
+        int userId = getAuthenticatedUserId();
+
+        String filePath
+                = "D:/movie_booking/daily-report-" + date + ".pdf";
+
+        reportService.generateDailyReportPdf(
+                LocalDate.parse(date),
+                userId,
+                filePath
+        );
+
+        File file = new File(filePath);
+
+        return Response.ok(file)
+                .header(
+                        "Content-Disposition",
+                        "attachment; filename=\"daily-report-"
+                        + date + ".pdf\""
+                )
+                .build();
+    }
+
     @Context
     private HttpServletRequest httpRequest;
 

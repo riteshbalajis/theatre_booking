@@ -31,15 +31,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+function resolvePosterUrl(url) {
+  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+  const context = (typeof API_CONTEXT_PATH !== 'undefined') ? API_CONTEXT_PATH : '';
+  if (context === '' && trimmed.startsWith('/movie_booking/')) {
+    return trimmed.replace('/movie_booking', '');
+  }
+  if (context && !trimmed.startsWith(context)) {
+    return `${context}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
+  }
+  return trimmed;
+}
+window.resolvePosterUrl = resolvePosterUrl;
+
 function movieCard(movie, isUpcoming = false) {
   const upcoming = isUpcoming || movie.status === 'UPCOMING';
   const releaseDateStr = movie.releaseDate ? formatDate(movie.releaseDate) : 'Coming Soon';
+  const posterUrl = resolvePosterUrl(movie.posterUrl);
+
+  const posterHtml = posterUrl
+    ? `<div class="poster-placeholder has-poster" style="position: relative; overflow: hidden;">
+        <img class="movie-card-poster-img" src="${posterUrl}" alt="${escapeHtml(movie.title)}" loading="lazy" onerror="this.style.display='none'; this.parentElement.classList.remove('has-poster');">
+        <span class="movie-card-fallback-title">${escapeHtml(movie.title)}</span>
+        ${upcoming ? '<span class="badge badge-upcoming" style="position: absolute; top: 10px; right: 10px; z-index: 2;">Upcoming</span>' : ''}
+      </div>`
+    : `<div class="poster-placeholder" style="position: relative; overflow: hidden;">
+        <span class="movie-card-fallback-title">${escapeHtml(movie.title)}</span>
+        ${upcoming ? '<span class="badge badge-upcoming" style="position: absolute; top: 10px; right: 10px; z-index: 2;">Upcoming</span>' : ''}
+      </div>`;
 
   return `<article class="movie-card">
-  <div class="poster-placeholder" style="position: relative; overflow: hidden;">
-    ${escapeHtml(movie.title)}
-    ${upcoming ? '<span class="badge badge-upcoming" style="position: absolute; top: 10px; right: 10px; z-index: 2;">Upcoming</span>' : ''}
-  </div>
+  ${posterHtml}
   <div class="movie-card-body">
     <h3>${escapeHtml(movie.title)}</h3>
   
@@ -287,8 +313,7 @@ async function loadTheatreDetails() {
     }
 
     if (showDateInput && showList) {
-      showDateInput.value = '';
-      showList.innerHTML = '<p class="muted">Select a date to view shows at this theatre.</p>';
+      showDateInput.value = todayIso();
 
       const loadTheatreShows = async () => {
         if (!showDateInput.value) {
@@ -299,9 +324,11 @@ async function loadTheatreDetails() {
         setMessage(showMessage, 'Loading showtimes...');
         showList.innerHTML = '';
         try {
-          const response = await API.get(
-            `/api/theatres/${id}/shows/${showDateInput.value}`
-          );
+          const [response, showsOnDate, allMovies] = await Promise.all([
+            API.get(`/api/theatres/${id}/shows/${showDateInput.value}`),
+            API.get(`/api/shows/date/${showDateInput.value}`).catch(() => []),
+            API.get('/api/movies').catch(() => [])
+          ]);
           const shows = response && response.shows ? response.shows : [];
 
           if (!shows.length) {
@@ -309,6 +336,52 @@ async function loadTheatreDetails() {
             setMessage(showMessage, '');
             return;
           }
+
+          const showMovieMap = {};
+          (showsOnDate || []).forEach(s => {
+            if (s && s.showId && s.movieId) {
+              showMovieMap[s.showId] = s.movieId;
+            }
+          });
+
+          const movieMap = {};
+          (allMovies || []).forEach(m => {
+            if (m && m.movieId) {
+              movieMap[m.movieId] = m;
+            }
+          });
+
+          // Fetch individual show details for any shows not mapped yet
+          await Promise.all(shows.map(async show => {
+            if (!showMovieMap[show.showId]) {
+              try {
+                const s = await API.get(`/api/shows/${show.showId}`);
+                if (s && s.movieId) {
+                  showMovieMap[show.showId] = s.movieId;
+                  if (!movieMap[s.movieId]) {
+                    movieMap[s.movieId] = await API.get(`/api/movies/${s.movieId}`);
+                  }
+                }
+              } catch (e) {}
+            }
+          }));
+
+          // Group shows by movie so each movie is clearly labeled with its shows
+          const showsByMovie = {};
+          shows.forEach(show => {
+            const mid = showMovieMap[show.showId] || 0;
+            const movie = movieMap[mid] || null;
+            const movieTitle = movie ? movie.title : (mid ? `Movie #${mid}` : 'Feature Film');
+            if (!showsByMovie[mid]) {
+              showsByMovie[mid] = {
+                movieId: mid,
+                movie,
+                movieTitle,
+                shows: []
+              };
+            }
+            showsByMovie[mid].shows.push(show);
+          });
 
           showList.innerHTML = `
             <article class="theatre-show-group">
@@ -318,15 +391,36 @@ async function loadTheatreDetails() {
                   ${response.theatreLocation ? `<span class="theatre-location"><span class="loc-pin">📍</span> ${escapeHtml(response.theatreLocation)}</span>` : ''}
                 </div>
               </div>
-              <div class="show-slots-grid">
-                ${shows.map(show => `
-                  <a class="show-slot-box" href="seats.html?showId=${show.showId}"
-                     title="${escapeHtml(show.screenName || 'Screen')}: ${formatTime(show.startTime)} - ${formatTime(show.endTime)}">
-                    <span class="slot-screen">${escapeHtml(show.screenName || 'Screen')}</span>
-                    <strong class="slot-time">${formatTime(show.startTime)}</strong>
-                    <span class="slot-action">${show.regularPrice ? 'From ₹' + show.regularPrice : 'Select Seats'}</span>
-                  </a>
-                `).join('')}
+              <div class="theatre-movie-shows-list">
+                ${Object.values(showsByMovie).map(group => {
+                  const posterUrl = group.movie && group.movie.posterUrl ? resolvePosterUrl(group.movie.posterUrl) : null;
+                  return `
+                  <div class="theatre-movie-row" style="padding: 16px 0; border-top: 1px solid var(--line);">
+                    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
+                      ${posterUrl
+                        ? `<img src="${posterUrl}" alt="" style="width: 44px; height: 60px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">`
+                        : `<div style="width: 44px; height: 60px; background: var(--teal); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #fff;">🎬</div>`}
+                      <div>
+                        <h4 style="margin: 0; font-size: 1.25rem; color: var(--ink); font-weight: 700;">${escapeHtml(group.movieTitle)}</h4>
+                        <p class="muted" style="margin: 2px 0 0; font-size: 0.88rem;">
+                          ${group.movie && group.movie.genre ? `${escapeHtml(group.movie.genre)} &middot; ` : ''}
+                          ${group.movie && group.movie.language ? `${escapeHtml(group.movie.language)} &middot; ` : ''}
+                          ${group.movie && group.movie.durationMinutes ? `${group.movie.durationMinutes} min` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div class="show-slots-grid">
+                      ${group.shows.map(show => `
+                        <a class="show-slot-box" href="seats.html?showId=${show.showId}"
+                           title="${escapeHtml(group.movieTitle)}: ${escapeHtml(show.screenName || 'Screen')} (${formatTime(show.startTime)} - ${formatTime(show.endTime)})">
+                          <span class="slot-screen">${escapeHtml(show.screenName || 'Screen')}</span>
+                          <strong class="slot-time">${formatTime(show.startTime)}</strong>
+                          <span class="slot-action">${show.regularPrice ? 'From ₹' + show.regularPrice : 'Select Seats'}</span>
+                        </a>
+                      `).join('')}
+                    </div>
+                  </div>`;
+                }).join('')}
               </div>
             </article>`;
           setMessage(showMessage, '');
@@ -336,6 +430,7 @@ async function loadTheatreDetails() {
       };
 
       showDateInput.addEventListener('change', loadTheatreShows);
+      loadTheatreShows();
     }
 
     setMessage(message, '');
@@ -1435,8 +1530,27 @@ function setupRegister() {
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    setMessage(message, 'Sending verification code...');
     const data = Object.fromEntries(new FormData(form));
+    const password = data.password || '';
+
+    if (password.length < 8) {
+      setMessage(message, 'Password must contain at least 8 characters.', 'error');
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setMessage(message, 'Password must contain at least one capital letter.', 'error');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setMessage(message, 'Password must contain at least one number.', 'error');
+      return;
+    }
+    if (!/[^a-zA-Z0-9]/.test(password)) {
+      setMessage(message, 'Password must contain at least one special character.', 'error');
+      return;
+    }
+
+    setMessage(message, 'Sending verification code...');
     if (submitButton) submitButton.disabled = true;
     try {
       const response = await API.post('/api/auth/register', data);
@@ -1555,10 +1669,19 @@ async function loadDetails() {
     const isUpcoming = movie.status === 'UPCOMING' || isFutureRelease;
     const releaseDateStr = movie.releaseDate ? formatDate(movie.releaseDate) : '';
 
-    detail.innerHTML = `<div class="detail-poster" style="position: relative;">
-      ${escapeHtml(movie.title)}
-      ${isUpcoming ? '<span class="badge badge-upcoming" style="position:absolute;top:16px;right:16px;">Upcoming</span>' : ''}
-    </div>
+    const detailPosterUrl = resolvePosterUrl(movie.posterUrl);
+    const detailPosterHtml = detailPosterUrl
+      ? `<div class="detail-poster has-poster" style="position: relative; overflow: hidden;">
+          <img class="detail-poster-img" src="${detailPosterUrl}" alt="${escapeHtml(movie.title)}" onerror="this.style.display='none'; this.parentElement.classList.remove('has-poster');">
+          <span class="detail-poster-fallback-title">${escapeHtml(movie.title)}</span>
+          ${isUpcoming ? '<span class="badge badge-upcoming" style="position:absolute;top:16px;right:16px;z-index:2;">Upcoming</span>' : ''}
+        </div>`
+      : `<div class="detail-poster" style="position: relative;">
+          <span class="detail-poster-fallback-title">${escapeHtml(movie.title)}</span>
+          ${isUpcoming ? '<span class="badge badge-upcoming" style="position:absolute;top:16px;right:16px;">Upcoming</span>' : ''}
+        </div>`;
+
+    detail.innerHTML = `${detailPosterHtml}
     <div class="detail-copy">
       <p class="eyebrow">${isUpcoming ? 'Coming Soon' : 'Movie details'}</p>
       <h1>${escapeHtml(movie.title)}</h1>
@@ -1648,7 +1771,50 @@ async function loadSeats() {
         screenName = scr ? scr.name : null;
       } catch (e) { }
     }
-    summary.textContent = `${formatDate(show.showDate)} | ${formatTime(show.startTime)} - ${formatTime(show.endTime)}${screenName ? ` | ${screenName}` : ''}`;
+
+    let movie = null;
+    if (show.movieId) {
+      try {
+        movie = await API.get(`/api/movies/${show.movieId}`);
+      } catch (e) { }
+    }
+    const movieTitle = movie ? movie.title : '';
+
+    const headingH1 = qs('.page-heading h1');
+    if (headingH1 && movieTitle && !isAdmin) {
+      headingH1.innerHTML = `Select your seats <span style="font-size: 1.15rem; font-weight: normal; color: var(--muted);">&middot; ${escapeHtml(movieTitle)}</span>`;
+    }
+
+    if (summary) {
+      summary.innerHTML = `${movieTitle ? `<strong style="color: var(--teal); font-size: 1.05rem;">🎬 ${escapeHtml(movieTitle)}</strong> &middot; ` : ''}${formatDate(show.showDate)} &middot; ${formatTime(show.startTime)} - ${formatTime(show.endTime)}${screenName ? ` &middot; <strong>${escapeHtml(screenName)}</strong>` : ''}`;
+    }
+
+    const screenLabel = qs('.screen-label');
+    if (screenLabel && movieTitle) {
+      screenLabel.textContent = `SCREEN · ${movieTitle.toUpperCase()}`;
+    }
+
+    if (movieTitle && sidebar && !isAdmin) {
+      let movieBanner = sidebar.querySelector('#seat-movie-banner');
+      if (!movieBanner) {
+        movieBanner = document.createElement('div');
+        movieBanner.id = 'seat-movie-banner';
+        movieBanner.style.cssText = 'margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line);';
+        sidebar.insertBefore(movieBanner, sidebar.firstChild);
+      }
+      const posterUrl = movie.posterUrl ? resolvePosterUrl(movie.posterUrl) : null;
+      movieBanner.innerHTML = `
+        <span class="eyebrow" style="font-size: 0.72rem;">Selected Movie</span>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+          ${posterUrl ? `<img src="${posterUrl}" alt="" style="width: 38px; height: 52px; object-fit: cover; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">` : '<span style="font-size: 1.5rem;">🎬</span>'}
+          <div>
+            <strong style="font-size: 1.05rem; color: var(--ink); display: block;">${escapeHtml(movieTitle)}</strong>
+            <small class="muted">${escapeHtml(movie.genre || '')}${movie.genre && movie.language ? ' &middot; ' : ''}${escapeHtml(movie.language || '')}</small>
+          </div>
+        </div>
+      `;
+    }
+
     const seats = await API.get(`/api/show-seats/show/${showId}`);
     renderSeatMap(seats);
     if (isAdmin && sidebar) {
@@ -2085,8 +2251,16 @@ const ADMIN_CONFIG = {
     */
 
 
-    fields: [['title', 'Title', 'text', true], ['description', 'Description', 'textarea', false], ['durationMinutes', 'Duration (minutes)', 'number', true], ['language', 'Language', 'text', true], ['genre', 'Genre', 'text', false], ['releaseDate', 'Release date', 'date', false]],
-    columns: [['title', 'Title'], ['genre', 'Genre'], ['language', 'Language'], ['durationMinutes', 'Minutes'], ['status', 'Status']]
+    fields: [
+      ['title', 'Title', 'text', true],
+      ['description', 'Description', 'textarea', false],
+      ['durationMinutes', 'Duration (minutes)', 'number', true],
+      ['language', 'Language', 'text', true],
+      ['genre', 'Genre', 'text', false],
+      ['releaseDate', 'Release date', 'date', true],
+      ['poster', 'Movie Poster', 'file', false]
+    ],
+    columns: [['posterUrl', 'Poster'], ['title', 'Title'], ['genre', 'Genre'], ['language', 'Language'], ['durationMinutes', 'Minutes'], ['status', 'Status']]
   },
   theatres: {
     title: 'Theatres', endpoint: '/api/theatres', id: 'theatreId',
@@ -2337,6 +2511,18 @@ async function formMarkup(config, item = {}) {
     const value = item[name] ?? '';
     if (type.startsWith('select-')) return `<label>${label}${optionMarkup(type, await adminOptions(type), value)}</label>`;
     if (type === 'textarea') return `<label class="wide">${label}<textarea name="${name}" ${required ? 'required' : ''}>${escapeHtml(value)}</textarea></label>`;
+    if (type === 'file') {
+      const existingPoster = item.posterUrl ? resolvePosterUrl(item.posterUrl) : null;
+      return `<label class="wide admin-file-field">
+        <span class="field-label-text">${label}</span>
+        <input name="${name}" type="file" accept="image/jpeg,image/png,image/webp,image/jpg" ${required ? 'required' : ''} data-poster-input>
+        <small class="muted file-hint">${existingPoster ? 'Select a new image to update current poster, or leave blank to keep existing.' : 'Choose image file: JPG, JPEG, PNG, or WEBP (optional).'}</small>
+        <div class="poster-preview-wrapper" id="admin-poster-preview-wrapper" style="${existingPoster ? '' : 'display:none;'} margin-top: 10px;">
+          <span class="preview-title" style="display:block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px;">Poster Preview:</span>
+          <img id="admin-poster-preview-img" src="${existingPoster || ''}" alt="Poster Preview" style="width: 100px; height: 140px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); box-shadow: var(--shadow);">
+        </div>
+      </label>`;
+    }
     let inputVal = value;
     if (type === 'time') {
       inputVal = (formatTime(value) === 'Time unavailable' ? '' : formatTime(value));
@@ -2360,7 +2546,27 @@ async function renderAdminResource(resource) {
   }
   const config = ADMIN_CONFIG[resource]; const workspace = qs('#admin-workspace'); const message = qs('#page-message');
   workspace.innerHTML = '<p class="muted">Loading resource...</p>';
-  try { const items = resource === 'seats' ? await loadAllSeats() : await API.get(config.endpoint); const rows = items || []; workspace.innerHTML = `<div class="admin-toolbar"><h2>${config.title}</h2><button class="button button-small" data-new-resource>New ${config.title.slice(0, -1)}</button></div><div data-admin-form></div><table class="admin-table"><thead><tr>${config.columns.map(([, label]) => `<th>${label}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr>${config.columns.map(([key]) => { let cellVal = item[key]; if (key === 'startTime' || key === 'endTime') cellVal = formatTime(cellVal); else if (key === 'showDate' || key === 'releaseDate') cellVal = formatDate(cellVal); return `<td>${escapeHtml(cellVal)}</td>`; }).join('')}<td><div class="admin-actions"><button class="button button-small" data-edit="${item[config.id]}">Edit</button><button class="button button-small danger" data-delete="${item[config.id]}">Deactivate</button></div></td></tr>`).join('')}</tbody></table>`; workspace.querySelector('[data-new-resource]').addEventListener('click', () => openAdminForm(resource)); workspace.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openAdminForm(resource, rows.find(item => String(item[config.id]) === button.dataset.edit)))); workspace.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deactivateResource(resource, button.dataset.delete))); setMessage(message, rows.length ? '' : `No ${config.title.toLowerCase()} found.`); } catch (error) { setMessage(message, error.message, 'error'); workspace.innerHTML = ''; }
+  try {
+    const items = resource === 'seats' ? await loadAllSeats() : await API.get(config.endpoint);
+    const rows = items || [];
+    workspace.innerHTML = `<div class="admin-toolbar"><h2>${config.title}</h2><button class="button button-small" data-new-resource>New ${config.title.slice(0, -1)}</button></div><div data-admin-form></div><table class="admin-table"><thead><tr>${config.columns.map(([, label]) => `<th>${label}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr>${config.columns.map(([key]) => {
+      if (key === 'posterUrl') {
+        const pUrl = resolvePosterUrl(item.posterUrl);
+        return `<td>${pUrl ? `<img src="${pUrl}" alt="Poster" class="admin-table-poster" onerror="this.style.display='none';">` : `<span class="admin-table-no-poster">None</span>`}</td>`;
+      }
+      let cellVal = item[key];
+      if (key === 'startTime' || key === 'endTime') cellVal = formatTime(cellVal);
+      else if (key === 'showDate' || key === 'releaseDate') cellVal = formatDate(cellVal);
+      return `<td>${escapeHtml(cellVal)}</td>`;
+    }).join('')}<td><div class="admin-actions"><button class="button button-small" data-edit="${item[config.id]}">Edit</button><button class="button button-small danger" data-delete="${item[config.id]}">Deactivate</button></div></td></tr>`).join('')}</tbody></table>`;
+    workspace.querySelector('[data-new-resource]').addEventListener('click', () => openAdminForm(resource));
+    workspace.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openAdminForm(resource, rows.find(item => String(item[config.id]) === button.dataset.edit))));
+    workspace.querySelectorAll('[data-delete]').forEach(button => button.addEventListener('click', () => deactivateResource(resource, button.dataset.delete)));
+    setMessage(message, rows.length ? '' : `No ${config.title.toLowerCase()} found.`);
+  } catch (error) {
+    setMessage(message, error.message, 'error');
+    workspace.innerHTML = '';
+  }
 }
 
 async function loadAllSeats() {
@@ -2370,11 +2576,94 @@ async function loadAllSeats() {
 }
 
 async function openAdminForm(resource, item = null) {
-  const config = ADMIN_CONFIG[resource]; const target = qs('[data-admin-form]');
-  const formConfig = item && resource === 'shows' ? { ...config, fields: config.fields.filter(([name]) => !['regularPrice', 'premiumPrice', 'reclinerPrice'].includes(name)) } : config;
-  target.innerHTML = `<div data-form-message class="message" role="alert"></div><form class="admin-form"><input type="hidden" name="recordId" value="${item ? item[config.id] : ''}">${await formMarkup(formConfig, item || {})}<div class="form-actions"><button class="button" type="submit">${item ? 'Save changes' : 'Create'}</button><button class="button button-small danger" type="button" data-close-form>Close</button></div></form>`;
+  const config = ADMIN_CONFIG[resource];
+  const target = qs('[data-admin-form]');
+  const formConfig = item && resource === 'shows'
+    ? { ...config, fields: config.fields.filter(([name]) => !['regularPrice', 'premiumPrice', 'reclinerPrice'].includes(name)) }
+    : config;
+
+  target.innerHTML = `<div data-form-message class="message" role="alert"></div>
+    <form class="admin-form" enctype="multipart/form-data">
+      <input type="hidden" name="recordId" value="${item ? item[config.id] : ''}">
+      ${await formMarkup(formConfig, item || {})}
+      <div class="form-actions">
+        <button class="button" type="submit">${item ? 'Save changes' : 'Create'}</button>
+        <button class="button button-small danger" type="button" data-close-form>Close</button>
+      </div>
+    </form>`;
+
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => {
+    const firstInput = target.querySelector('input:not([type="hidden"]), select, textarea');
+    if (firstInput) firstInput.focus();
+  }, 100);
+
   target.querySelector('[data-close-form]').addEventListener('click', () => { target.innerHTML = ''; });
-  target.querySelector('form').addEventListener('submit', async event => { event.preventDefault(); const form = event.target; const formMessage = target.querySelector('[data-form-message]'); const values = Object.fromEntries(new FormData(form)); delete values.recordId;['movieId', 'theatreId', 'screenId', 'durationMinutes', 'capacity', 'seatNumber'].forEach(key => { if (values[key] !== undefined) values[key] = Number(values[key]); });['regularPrice', 'premiumPrice', 'reclinerPrice'].forEach(key => { if (values[key] !== undefined) values[key] = Number(values[key]); }); setMessage(formMessage, ''); try { const id = form.elements.recordId.value; if (id) { await API.put(`${config.endpoint}/${id}`, values); } else { await API.post(config.endpoint, values); } await renderAdminResource(resource); } catch (error) { setMessage(formMessage, error.message, 'error'); } });
+
+  const posterInput = target.querySelector('[data-poster-input]');
+  if (posterInput) {
+    posterInput.addEventListener('change', event => {
+      const file = event.target.files && event.target.files[0];
+      const previewWrapper = target.querySelector('#admin-poster-preview-wrapper');
+      const previewImg = target.querySelector('#admin-poster-preview-img');
+      if (file && previewWrapper && previewImg) {
+        const objectUrl = URL.createObjectURL(file);
+        previewImg.src = objectUrl;
+        previewWrapper.style.display = 'block';
+      } else if (!item?.posterUrl && previewWrapper) {
+        previewWrapper.style.display = 'none';
+      }
+    });
+  }
+
+  target.querySelector('form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.target;
+    const formMessage = target.querySelector('[data-form-message]');
+    setMessage(formMessage, '');
+
+    try {
+      const id = form.elements.recordId ? form.elements.recordId.value : '';
+      if (resource === 'movies') {
+        const formData = new FormData();
+        formData.append('title', (form.elements.title.value || '').trim());
+        formData.append('description', form.elements.description ? form.elements.description.value.trim() : '');
+        formData.append('durationMinutes', form.elements.durationMinutes.value || '0');
+        formData.append('language', (form.elements.language.value || '').trim());
+        formData.append('genre', form.elements.genre ? form.elements.genre.value.trim() : '');
+        formData.append('releaseDate', form.elements.releaseDate.value || '');
+
+        const fileInput = form.querySelector('input[type="file"][name="poster"]');
+        if (fileInput && fileInput.files && fileInput.files[0] && fileInput.files[0].size > 0) {
+          formData.append('poster', fileInput.files[0]);
+        }
+
+        if (id) {
+          await API.put(`${config.endpoint}/${id}`, formData);
+        } else {
+          await API.post(config.endpoint, formData);
+        }
+      } else {
+        const values = Object.fromEntries(new FormData(form));
+        delete values.recordId;
+        ['movieId', 'theatreId', 'screenId', 'durationMinutes', 'capacity', 'seatNumber'].forEach(key => {
+          if (values[key] !== undefined) values[key] = Number(values[key]);
+        });
+        ['regularPrice', 'premiumPrice', 'reclinerPrice'].forEach(key => {
+          if (values[key] !== undefined) values[key] = Number(values[key]);
+        });
+
+        if (id) {
+          await API.put(`${config.endpoint}/${id}`, values);
+        } else {
+          await API.post(config.endpoint, values);
+        }
+      }
+      await renderAdminResource(resource);
+    } catch (error) {
+      setMessage(formMessage, error.message, 'error');
+    }
+  });
 }
 
 async function deactivateResource(resource, id) { if (!window.confirm('Deactivate this resource?')) return; const config = ADMIN_CONFIG[resource]; try { await API.remove(`${config.endpoint}/${id}`); await renderAdminResource(resource); } catch (error) { setMessage(qs('#page-message'), error.message, 'error'); } }

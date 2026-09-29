@@ -13,7 +13,7 @@ public class MovieResponse {
     private String genre;
     private LocalDate releaseDate;
     private MovieStatus status;
-    
+    private String posterUrl;
 
     public MovieResponse() { }
 
@@ -33,5 +33,6 @@ public class MovieResponse {
     public void setReleaseDate(LocalDate releaseDate) { this.releaseDate = releaseDate; }
     public MovieStatus getStatus() { return status; }
     public void setStatus(MovieStatus status) { this.status = status; }
-    
+    public String getPosterUrl() { return posterUrl; }
+    public void setPosterUrl(String posterUrl) { this.posterUrl = posterUrl; }
 }

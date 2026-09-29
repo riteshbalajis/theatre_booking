@@ -1,8 +1,5 @@
 package com.movie_booking.dao;
 
-import com.movie_booking.model.Movie;
-import com.movie_booking.model.MovieStatus;
-import com.movie_booking.util.DBConnection;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -13,14 +10,18 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.movie_booking.model.Movie;
+import com.movie_booking.model.MovieStatus;
+import com.movie_booking.util.DBConnection;
+
 public class MovieDaoImpl implements MovieDao {
     private static final String BASE_SELECT = "SELECT movie_id, title, description, "
-            + "duration_minutes, language, genre, release_date, status, created_at FROM movies";
+            + "duration_minutes, language, genre, release_date, status, poster_filename, created_at FROM movies";
 
     @Override
     public int createMovie(Movie movie) throws SQLException {
         String sql = "INSERT INTO movies (title, description, duration_minutes, language, genre, "
-                + "release_date, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                + "release_date, status, poster_filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection connection = DBConnection.getConnection();
                 PreparedStatement statement = connection.prepareStatement(sql,
@@ -133,7 +134,7 @@ public class MovieDaoImpl implements MovieDao {
     @Override
     public boolean updateMovie(Movie movie) throws SQLException {
         String sql = "UPDATE movies SET title = ?, description = ?, duration_minutes = ?, "
-                + "language = ?, genre = ?, release_date = ? WHERE movie_id = ?";
+                + "language = ?, genre = ?, release_date = ?, poster_filename = COALESCE(?, poster_filename) WHERE movie_id = ?";
 
         try (Connection connection = DBConnection.getConnection();
                 PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -143,7 +144,19 @@ public class MovieDaoImpl implements MovieDao {
             statement.setString(4, movie.getLanguage());
             statement.setString(5, movie.getGenre());
             setNullableDate(statement, 6, movie);
-            statement.setInt(7, movie.getMovieId());
+            statement.setString(7, movie.getPosterFileName());
+            statement.setInt(8, movie.getMovieId());
+            return statement.executeUpdate() > 0;
+        }
+    }
+
+    @Override
+    public boolean updatePoster(int movieId, String posterFilename) throws SQLException {
+        String sql = "UPDATE movies SET poster_filename = ? WHERE movie_id = ?";
+        try (Connection connection = DBConnection.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, posterFilename);
+            statement.setInt(2, movieId);
             return statement.executeUpdate() > 0;
         }
     }
@@ -177,6 +190,7 @@ public class MovieDaoImpl implements MovieDao {
         setNullableDate(statement, 6, movie);
         statement.setString(7, movie.getStatus() == null
                 ? MovieStatus.UPCOMING.name() : movie.getStatus().name());
+        statement.setString(8, movie.getPosterFileName());
     }
 
     private void setNullableDate(PreparedStatement statement, int parameterIndex, Movie movie)
@@ -225,6 +239,7 @@ public class MovieDaoImpl implements MovieDao {
         movie.setGenre(resultSet.getString("genre"));
         movie.setReleaseDate(releaseDate == null ? null : releaseDate.toLocalDate());
         movie.setStatus(MovieStatus.valueOf(resultSet.getString("status")));
+        movie.setPosterFileName(resultSet.getString("poster_filename"));
         movie.setCreatedAt(createdAt == null ? null : createdAt.toLocalDateTime());
         return movie;
     }

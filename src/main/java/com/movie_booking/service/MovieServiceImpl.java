@@ -1,20 +1,31 @@
 package com.movie_booking.service;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.UUID;
+
 import com.movie_booking.dao.MovieDao;
 import com.movie_booking.dao.MovieDaoImpl;
 import com.movie_booking.dao.UserDao;
 import com.movie_booking.dao.UserDaoImpl;
+import com.movie_booking.exception.MovieNotFoundException;
 import com.movie_booking.model.Movie;
 import com.movie_booking.model.MovieStatus;
 import com.movie_booking.model.User;
 import com.movie_booking.model.UserRole;
 import com.movie_booking.model.UserStatus;
-import java.sql.SQLException;
-import java.util.List;
 
 public class MovieServiceImpl implements MovieService {
+
     private final MovieDao movieDao;
     private final UserDao userDao;
+    private static final String POSTER_DIRECTORY = "D:/movie_booking/uploads/movie-posters";
 
     public MovieServiceImpl() {
         this(new MovieDaoImpl(), new UserDaoImpl());
@@ -45,6 +56,42 @@ public class MovieServiceImpl implements MovieService {
             movie.setStatus(MovieStatus.ACTIVE);
         }
         return movieDao.createMovie(movie);
+    }
+
+    @Override
+    public String saveMoviePoster(InputStream inputStream, String originalFileName) throws IOException {
+
+        if (inputStream == null) {
+            throw new IllegalArgumentException("Poster file is required.");
+        }
+
+        if (originalFileName == null || originalFileName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Poster filename is required.");
+        }
+
+        Path uploadDirectory = Paths.get(POSTER_DIRECTORY);
+
+        Files.createDirectories(uploadDirectory);
+
+        String extension = "";
+
+        int dotIndex = originalFileName.lastIndexOf('.');
+
+        if (dotIndex >= 0) {
+            extension = originalFileName.substring(dotIndex).toLowerCase();
+        }
+
+        String uniqueFileName = UUID.randomUUID() + extension;
+
+        Path targetPath = uploadDirectory.resolve(uniqueFileName);
+
+        Files.copy(
+                inputStream,
+                targetPath,
+                StandardCopyOption.REPLACE_EXISTING
+        );
+
+        return uniqueFileName;
     }
 
     @Override
@@ -96,16 +143,70 @@ public class MovieServiceImpl implements MovieService {
     }
 
     @Override
-    public boolean updateMovie(Movie movie, int authenticatedUserId) throws SQLException {
+    public boolean updateMovie(
+            Movie movie,
+            int authenticatedUserId,
+            InputStream posterInputStream,
+            String originalFileName)
+            throws SQLException, IOException {
+
         requireAdmin(authenticatedUserId);
-        validateMovieForUpdate(movie);
-        Movie existing = movieDao.findByTitle(movie.getTitle().trim());
-        if (existing != null && existing.getMovieId() != movie.getMovieId()) {
-            throw new IllegalArgumentException("Movie title already exists.");
+
+        validateMovie(movie);
+
+        if (posterInputStream != null
+                && originalFileName != null
+                && !originalFileName.isBlank()) {
+
+            String newPosterFileName
+                    = saveMoviePoster(posterInputStream, originalFileName);
+
+            movie.setPosterFileName(newPosterFileName);
         }
-        movie.setTitle(movie.getTitle().trim());
-        movie.setLanguage(movie.getLanguage().trim());
-        return movieDao.updateMovie(movie);
+
+        boolean updated = movieDao.updateMovie(movie);
+
+        if (!updated) {
+            throw new MovieNotFoundException(
+                    "Movie not found with ID: " + movie.getMovieId()
+            );
+        }
+
+        return true;
+
+    }
+
+    @Override
+    public Path getMoviePoster(int movieId) throws SQLException {
+
+        Movie movie = movieDao.findById(movieId);
+
+        if (movie == null) {
+            throw new MovieNotFoundException(
+                    "Movie not found with ID: " + movieId
+            );
+        }
+
+        String posterFileName = movie.getPosterFileName();
+
+        if (posterFileName == null || posterFileName.isBlank()) {
+            throw new MovieNotFoundException(
+                    "Poster not found for movie ID: " + movieId
+            );
+        }
+
+        Path posterPath = Paths.get(
+                POSTER_DIRECTORY,
+                posterFileName
+        );
+
+        if (!Files.exists(posterPath)) {
+            throw new MovieNotFoundException(
+                    "Poster file not found for movie ID: " + movieId
+            );
+        }
+
+        return posterPath;
     }
 
     @Override

@@ -42,6 +42,23 @@ function formatTime(value) {
   return str.length >= 5 ? str.slice(0, 5) : str;
 }
 function todayIso() { return new Date().toISOString().slice(0, 10); }
+
+function resolvePosterUrl(url) {
+  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+  const context = (typeof API_CONTEXT_PATH !== 'undefined') ? API_CONTEXT_PATH : '';
+  if (context === '' && trimmed.startsWith('/movie_booking/')) {
+    return trimmed.replace('/movie_booking', '');
+  }
+  if (context && !trimmed.startsWith(context)) {
+    return `${context}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
+  }
+  return trimmed;
+}
+
 function setMessage(element, text, type = '') { if (element) { element.textContent = text || ''; element.className = `message ${type}`.trim(); } }
 function getSavedUser() { try { return JSON.parse(sessionStorage.getItem('screenlyUser') || 'null'); } catch (error) { return null; } }
 function saveUser(user) { sessionStorage.setItem('screenlyUser', JSON.stringify(user)); }

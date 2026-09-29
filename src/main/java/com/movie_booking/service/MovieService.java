@@ -1,9 +1,13 @@
 package com.movie_booking.service;
 
-import com.movie_booking.model.Movie;
-import com.movie_booking.model.MovieStatus;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
+
+import com.movie_booking.model.Movie;
+import com.movie_booking.model.MovieStatus;
 
 public interface MovieService {
     int addMovie(Movie movie, int authenticatedUserId) throws SQLException;
@@ -24,7 +28,10 @@ public interface MovieService {
 
     List<Movie> getMoviesByGenre(String genre) throws SQLException;
 
-    boolean updateMovie(Movie movie, int authenticatedUserId) throws SQLException;
+    //boolean updateMovie(Movie movie, int authenticatedUserId) throws SQLException;
+
+    boolean updateMovie(Movie movie, int authenticatedUserId,InputStream posterInputStream,
+        String originalFileName) throws SQLException, IOException;
 
     boolean activateMovie(int movieId, int authenticatedUserId) throws SQLException;
 
@@ -35,4 +42,8 @@ public interface MovieService {
     List<Movie> getUpcomingMovies() throws SQLException;
 
     boolean releaseMovie(int movieId, int authenticatedUserId) throws SQLException;
+
+    public String saveMoviePoster(InputStream inputStream, String originalFileName) throws IOException;
+
+    Path getMoviePoster(int movieId) throws SQLException;
 }

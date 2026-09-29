@@ -39,4 +39,11 @@ public class AppConfig {
         }
         return val;
     }
+
+    /**
+     * Gets the poster storage path from configuration.
+     */
+    public static String getPosterStoragePath() {
+        return getRequired("POSTER_STORAGE_PATH");
+    }
 }

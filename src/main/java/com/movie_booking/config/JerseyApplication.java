@@ -1,5 +1,6 @@
 package com.movie_booking.config;
 
+import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 
 public class JerseyApplication extends ResourceConfig {
@@ -11,5 +12,6 @@ public class JerseyApplication extends ResourceConfig {
             "com.movie_booking.config"
         );
         register(ObjectMapperContextResolver.class);
+        register(MultiPartFeature.class);
     }
 }

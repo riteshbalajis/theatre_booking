@@ -2,7 +2,6 @@ package com.movie_booking.model;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import com.movie_booking.model.MovieStatus;
 
 public class Movie {
     private int movieId;
@@ -14,6 +13,7 @@ public class Movie {
     private LocalDate releaseDate;
     private MovieStatus status;
     private LocalDateTime createdAt;
+    private String posterFileName;
 
     public Movie() {
     }
@@ -49,4 +49,6 @@ public class Movie {
     public void setStatus(MovieStatus status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public String getPosterFileName() { return posterFileName; }
+    public void setPosterFileName(String posterFileName) { this.posterFileName = posterFileName; }
 }

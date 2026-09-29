@@ -51,6 +51,13 @@
             <version>2.39</version>
         </dependency>
 
+        <!-- Multipart support for file uploads -->
+        <dependency>
+            <groupId>org.glassfish.jersey.media</groupId>
+            <artifactId>jersey-media-multipart</artifactId>
+            <version>2.39</version>
+        </dependency>
+
         <!-- Jersey dependency injection -->
         <dependency>
             <groupId>org.glassfish.jersey.inject</groupId>

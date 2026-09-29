@@ -1,8 +1,9 @@
 package com.movie_booking.dao;
 
-import com.movie_booking.model.Movie;
 import java.sql.SQLException;
 import java.util.List;
+
+import com.movie_booking.model.Movie;
 
 public interface MovieDao {
     int createMovie(Movie movie) throws SQLException;
@@ -34,4 +35,7 @@ public interface MovieDao {
     boolean deactivateMovie(int movieId) throws SQLException;
 
     boolean activateMovie(int movieId) throws SQLException;
+
+    boolean updatePoster(int movieId, String posterFilename) throws SQLException;
+
 }

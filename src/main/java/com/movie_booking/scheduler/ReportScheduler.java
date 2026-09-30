@@ -34,15 +34,15 @@ public class ReportScheduler {
 
         LocalDateTime now = LocalDateTime.now();
 
-        /*LocalDateTime nextRun = LocalDateTime.of(
+        LocalDateTime nextRun = LocalDateTime.of(
                 now.toLocalDate().plusDays(1),
                 LocalTime.of(0, 5)
-        );*/
+        );
 
-        LocalDateTime nextRun = LocalDateTime.of(
+        /*LocalDateTime nextRun = LocalDateTime.of(
         LocalDate.now(),
         LocalTime.of(17, 21)
-);
+);*/
 
         long initialDelay =
                 Duration.between(now, nextRun).getSeconds();

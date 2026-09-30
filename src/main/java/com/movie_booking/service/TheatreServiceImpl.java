@@ -1,5 +1,11 @@
 package com.movie_booking.service;
 
+import java.sql.SQLException;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.movie_booking.dao.TheatreDao;
 import com.movie_booking.dao.TheatreDaoImpl;
 import com.movie_booking.dao.UserDao;
@@ -9,12 +15,21 @@ import com.movie_booking.model.TheatreStatus;
 import com.movie_booking.model.User;
 import com.movie_booking.model.UserRole;
 import com.movie_booking.model.UserStatus;
-import java.sql.SQLException;
-import java.util.List;
 
 public class TheatreServiceImpl implements TheatreService {
     private final TheatreDao theatreDao;
     private final UserDao userDao;
+    private static final String ALL_THEATRES_CACHE_KEY = "all";
+    private static final Cache<Integer, Theatre> theatreCache
+        = Caffeine.newBuilder()
+            .maximumSize(1000)
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .build();
+    private static final Cache<String, List<Theatre>> theatreListCache
+        = Caffeine.newBuilder()
+            .maximumSize(1)
+            .expireAfterWrite(2, TimeUnit.MINUTES)
+            .build();
 
     public TheatreServiceImpl() {
         this(new TheatreDaoImpl(), new UserDaoImpl());
@@ -44,13 +59,27 @@ public class TheatreServiceImpl implements TheatreService {
         if (theatre.getStatus() == null) {
             theatre.setStatus(TheatreStatus.ACTIVE);
         }
-        return theatreDao.createTheatre(theatre);
+        int theatreId = theatreDao.createTheatre(theatre);
+        invalidateTheatreCaches(theatreId);
+        return theatreId;
     }
 
     @Override
     public Theatre getTheatreById(int theatreId) throws SQLException {
         requirePositiveId(theatreId);
-        return theatreDao.findById(theatreId);
+
+        Theatre cachedTheatre = theatreCache.getIfPresent(theatreId);
+        if (cachedTheatre != null) {
+            System.out.println("Theatre cache hit for ID: " + theatreId);
+            return cachedTheatre;
+        }
+
+        System.out.println("Theatre cache miss for ID: " + theatreId);
+        Theatre theatre = theatreDao.findById(theatreId);
+        if (theatre != null) {
+            theatreCache.put(theatreId, theatre);
+        }
+        return theatre;
     }
 
     @Override
@@ -61,7 +90,20 @@ public class TheatreServiceImpl implements TheatreService {
 
     @Override
     public List<Theatre> getAllTheatres() throws SQLException {
-        return theatreDao.findAll();
+        List<Theatre> cachedTheatres = theatreListCache.getIfPresent(ALL_THEATRES_CACHE_KEY);
+        if (cachedTheatres != null) {
+            System.out.println("Theatre list cache hit");
+            return cachedTheatres;
+        }
+
+        System.out.println("Theatre list cache miss");
+        List<Theatre> theatres = theatreDao.findAll();
+        if (theatres != null) {
+            List<Theatre> snapshot = List.copyOf(theatres);
+            theatreListCache.put(ALL_THEATRES_CACHE_KEY, snapshot);
+            return snapshot;
+        }
+        return null;
     }
 
     @Override
@@ -91,27 +133,44 @@ public class TheatreServiceImpl implements TheatreService {
         }
         theatre.setName(theatre.getName().trim());
         theatre.setLocation(theatre.getLocation().trim());
-        return theatreDao.updateTheatre(theatre);
+        boolean updated = theatreDao.updateTheatre(theatre);
+        if (updated) {
+            invalidateTheatreCaches(theatre.getTheatreId());
+        }
+        return updated;
     }
 
     @Override
     public boolean activateTheatre(int theatreId, int authenticatedUserId) throws SQLException {
         requireAdmin(authenticatedUserId);
         requirePositiveId(theatreId);
-        return theatreDao.activateTheatre(theatreId);
+        boolean activated = theatreDao.activateTheatre(theatreId);
+        if (activated) {
+            invalidateTheatreCaches(theatreId);
+        }
+        return activated;
     }
 
     @Override
     public boolean deactivateTheatre(int theatreId, int authenticatedUserId) throws SQLException {
         requireAdmin(authenticatedUserId);
         requirePositiveId(theatreId);
-        return theatreDao.deactivateTheatre(theatreId);
+        boolean deactivated = theatreDao.deactivateTheatre(theatreId);
+        if (deactivated) {
+            invalidateTheatreCaches(theatreId);
+        }
+        return deactivated;
     }
 
     @Override
     public boolean theatreExists(int theatreId) throws SQLException {
         requirePositiveId(theatreId);
         return theatreDao.existsById(theatreId);
+    }
+
+    private static void invalidateTheatreCaches(int theatreId) {
+        theatreCache.invalidate(theatreId);
+        theatreListCache.invalidate(ALL_THEATRES_CACHE_KEY);
     }
 
     private static void validateTheatre(Theatre theatre) {

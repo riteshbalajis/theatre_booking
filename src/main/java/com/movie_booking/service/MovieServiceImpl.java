@@ -9,7 +9,10 @@ import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.movie_booking.dao.MovieDao;
 import com.movie_booking.dao.MovieDaoImpl;
 import com.movie_booking.dao.UserDao;
@@ -26,6 +29,18 @@ public class MovieServiceImpl implements MovieService {
     private final MovieDao movieDao;
     private final UserDao userDao;
     private static final String POSTER_DIRECTORY = "D:/movie_booking/uploads/movie-posters";
+    private static final String ALL_MOVIES_CACHE_KEY = "all";
+
+    private static final Cache<Integer, Movie> movieCache
+            = Caffeine.newBuilder()
+                    .maximumSize(1000)
+                    .expireAfterWrite(10, TimeUnit.MINUTES)
+                    .build();
+                private static final Cache<String, List<Movie>> movieListCache
+                    = Caffeine.newBuilder()
+                        .maximumSize(1)
+                        .expireAfterWrite(2, TimeUnit.MINUTES)
+                        .build();
 
     public MovieServiceImpl() {
         this(new MovieDaoImpl(), new UserDaoImpl());
@@ -55,7 +70,9 @@ public class MovieServiceImpl implements MovieService {
         if (movie.getStatus() == null) {
             movie.setStatus(MovieStatus.ACTIVE);
         }
-        return movieDao.createMovie(movie);
+        int movieId = movieDao.createMovie(movie);
+        invalidateMovieCaches(movieId);
+        return movieId;
     }
 
     @Override
@@ -97,7 +114,19 @@ public class MovieServiceImpl implements MovieService {
     @Override
     public Movie getMovieById(int movieId) throws SQLException {
         requirePositiveId(movieId);
-        return movieDao.findById(movieId);
+
+        Movie cachedMovie = movieCache.getIfPresent(movieId);
+        if (cachedMovie != null) {
+            System.out.println("Movie cache hit for ID: " + movieId);
+            return cachedMovie;
+        }
+
+        System.out.println("Movie cache miss for ID: " + movieId);
+        Movie movie = movieDao.findById(movieId);
+        if (movie != null) {
+            movieCache.put(movieId, movie);
+        }
+        return movie;
     }
 
     @Override
@@ -108,7 +137,20 @@ public class MovieServiceImpl implements MovieService {
 
     @Override
     public List<Movie> getAllMovies() throws SQLException {
-        return movieDao.findAll();
+        List<Movie> cachedMovies = movieListCache.getIfPresent(ALL_MOVIES_CACHE_KEY);
+        if (cachedMovies != null) {
+            System.out.println("Movie list cache hit");
+            return cachedMovies;
+        }
+
+        System.out.println("Movie list cache miss");
+        List<Movie> movies = movieDao.findAll();
+        if (movies != null) {
+            List<Movie> snapshot = List.copyOf(movies);
+            movieListCache.put(ALL_MOVIES_CACHE_KEY, snapshot);
+            return snapshot;
+        }
+        return null;
     }
 
     @Override
@@ -172,6 +214,7 @@ public class MovieServiceImpl implements MovieService {
             );
         }
 
+        invalidateMovieCaches(movie.getMovieId());
         return true;
 
     }
@@ -213,14 +256,22 @@ public class MovieServiceImpl implements MovieService {
     public boolean activateMovie(int movieId, int authenticatedUserId) throws SQLException {
         requireAdmin(authenticatedUserId);
         requirePositiveId(movieId);
-        return movieDao.activateMovie(movieId);
+        boolean activated = movieDao.activateMovie(movieId);
+        if (activated) {
+            invalidateMovieCaches(movieId);
+        }
+        return activated;
     }
 
     @Override
     public boolean deactivateMovie(int movieId, int authenticatedUserId) throws SQLException {
         requireAdmin(authenticatedUserId);
         requirePositiveId(movieId);
-        return movieDao.deactivateMovie(movieId);
+        boolean deactivated = movieDao.deactivateMovie(movieId);
+        if (deactivated) {
+            invalidateMovieCaches(movieId);
+        }
+        return deactivated;
     }
 
     @Override
@@ -245,7 +296,16 @@ public class MovieServiceImpl implements MovieService {
         if (movie.getStatus() != MovieStatus.UPCOMING) {
             throw new IllegalStateException("Only upcoming movies can be released.");
         }
-        return movieDao.activateMovie(movieId);
+        boolean released = movieDao.activateMovie(movieId);
+        if (released) {
+            invalidateMovieCaches(movieId);
+        }
+        return released;
+    }
+
+    private static void invalidateMovieCaches(int movieId) {
+        movieCache.invalidate(movieId);
+        movieListCache.invalidate(ALL_MOVIES_CACHE_KEY);
     }
 
     private static void validateMovie(Movie movie) {

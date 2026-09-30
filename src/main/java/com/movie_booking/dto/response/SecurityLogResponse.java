@@ -1,8 +1,8 @@
-package com.movie_booking.model;
+package com.movie_booking.dto.response;
 
 import java.time.LocalDateTime;
 
-public class SecurityLog {
+public class SecurityLogResponse {
     private Long logId;
     private LocalDateTime timestamp;
     private String eventType;
@@ -12,11 +12,14 @@ public class SecurityLog {
     private String sessionId;
     private String details;
 
-    
-    public SecurityLog() {}
+    // Constructors, getters, setters
+    public SecurityLogResponse() {}
 
-    public SecurityLog(String eventType, Integer userId, String email, 
-                       String ipAddress, String sessionId, String details) {
+    public SecurityLogResponse(Long logId, LocalDateTime timestamp, String eventType,
+                               Integer userId, String email, String ipAddress,
+                               String sessionId, String details) {
+        this.logId = logId;
+        this.timestamp = timestamp;
         this.eventType = eventType;
         this.userId = userId;
         this.email = email;

@@ -2299,7 +2299,7 @@ async function loadAdmin() {
   });
 
   const hash = (window.location.hash || '').replace('#', '');
-  const initialResource = (hash && ['movies', 'theatres', 'screens', 'seats', 'shows', 'reports'].includes(hash))
+  const initialResource = (hash && ['movies', 'theatres', 'screens', 'seats', 'shows', 'reports', 'logs'].includes(hash))
     ? hash
     : 'movies';
 
@@ -2543,6 +2543,9 @@ async function formMarkup(config, item = {}) {
 async function renderAdminResource(resource) {
   if (resource === 'reports') {
     return renderAdminReports();
+  }
+  if (resource === 'logs') {
+    return renderAdminLogs();
   }
   const config = ADMIN_CONFIG[resource]; const workspace = qs('#admin-workspace'); const message = qs('#page-message');
   workspace.innerHTML = '<p class="muted">Loading resource...</p>';
@@ -3175,4 +3178,422 @@ async function renderAdminReports() {
   // Load preview immediately
   loadPreview();
 }
+
+async function renderAdminLogs() {
+  const workspace = qs('#admin-workspace');
+  const pageMessage = qs('#page-message');
+  setMessage(pageMessage, '');
+
+  workspace.innerHTML = `
+    <div class="logs-dashboard">
+      <div class="admin-toolbar" style="margin-bottom: 24px;">
+        <div>
+          <h2 style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.5rem;">📜</span> System &amp; Audit Logs
+          </h2>
+          <p class="muted" style="margin: 4px 0 0; font-size: 0.95rem;">
+            Inspect recent audit trails, catalogue modifications, and security authentication events.
+          </p>
+        </div>
+      </div>
+
+      <div class="log-controls-card report-card">
+        <div class="log-controls-grid" style="grid-template-columns: minmax(260px, 380px);">
+          <div class="log-control-group">
+            <label for="log-category-select" class="report-label">
+              <span>📋</span> Log Category
+            </label>
+            <div class="report-select-wrapper">
+              <select id="log-category-select" class="report-input-field report-select">
+                <option value="audit" selected>🛡️ Audit Logs (Entity &amp; Booking Actions)</option>
+                <option value="security">🔒 Security Logs (Auth &amp; Access)</option>
+              </select>
+            </div>
+            <span class="report-hint">Switch between catalogue/booking audit logs and security logs</span>
+          </div>
+        </div>
+
+        <div class="log-actions-bar">
+          <div class="log-summary-stats" id="log-summary-stats">
+            <span class="badge-num" id="log-count-badge">Loading...</span>
+          </div>
+          <div class="log-button-group">
+            <button type="button" id="btn-refresh-logs" class="button button-light button-small" title="Fetch latest logs from server">
+              <span class="btn-icon">🔄</span> Refresh Logs
+            </button>
+          </div>
+        </div>
+        <div id="log-form-message" class="message" role="status" style="margin-top: 14px; display: none;"></div>
+      </div>
+
+      <div id="log-loading" class="report-loading-container" style="display: none;">
+        <div class="report-spinner"></div>
+        <p class="muted" style="margin: 12px 0 0; font-weight: 600;">Fetching logs from server...</p>
+      </div>
+
+      <div id="log-results-view" class="log-results-view" style="margin-top: 24px;"></div>
+      <div id="log-modal-container"></div>
+    </div>
+  `;
+
+  const categorySelect = qs('#log-category-select', workspace);
+  const countBadge = qs('#log-count-badge', workspace);
+  const refreshBtn = qs('#btn-refresh-logs', workspace);
+  const statusMsg = qs('#log-form-message', workspace);
+  const loadingEl = qs('#log-loading', workspace);
+  const resultsView = qs('#log-results-view', workspace);
+  const modalContainer = qs('#log-modal-container', workspace);
+
+  let currentLogs = [];
+  let currentCategory = 'audit';
+
+  function setLogStatus(text, type = '') {
+    if (!text) {
+      statusMsg.style.display = 'none';
+      statusMsg.textContent = '';
+      statusMsg.className = 'message';
+      return;
+    }
+    statusMsg.style.display = 'block';
+    statusMsg.textContent = text;
+    statusMsg.className = `message ${type}`.trim();
+  }
+
+  function getBadgeClass(eventType) {
+    if (!eventType) return 'badge-default';
+    const upper = String(eventType).toUpperCase();
+    if (upper.includes('SUCCESS') || upper.includes('CREATED') || upper.includes('PAYMENT')) {
+      return 'badge-success';
+    }
+    if (upper.includes('FAILED') || upper.includes('DELETED') || upper.includes('UNAUTHORIZED') || upper.includes('CANCELLED')) {
+      return 'badge-danger';
+    }
+    if (upper.includes('REQUEST') || upper.includes('RESET') || upper.includes('WARNING')) {
+      return 'badge-warning';
+    }
+    if (upper.includes('UPDATED') || upper.includes('LOGOUT')) {
+      return 'badge-info';
+    }
+    return 'badge-default';
+  }
+
+  function getEventIcon(eventType) {
+    if (!eventType) return '📄';
+    const upper = String(eventType).toUpperCase();
+    if (upper === 'LOGIN_SUCCESS') return '🔑';
+    if (upper === 'LOGIN_FAILED') return '🚫';
+    if (upper === 'LOGOUT') return '🚪';
+    if (upper === 'UNAUTHORIZED_ACCESS') return '⚠️';
+    if (upper === 'PASSWORD_RESET_REQUEST') return '📧';
+    if (upper === 'PASSWORD_RESET_SUCCESS') return '🔐';
+    if (upper === 'MOVIE_CREATED') return '🎬';
+    if (upper === 'MOVIE_UPDATED') return '✏️';
+    if (upper === 'MOVIE_DELETED') return '🗑️';
+    if (upper === 'BOOKING_CREATED') return '🎟️';
+    if (upper === 'BOOKING_CANCELLED') return '❌';
+    if (upper === 'PAYMENT_RECEIVED') return '💳';
+    return '📝';
+  }
+
+  async function fetchLogs() {
+    setLogStatus('');
+    loadingEl.style.display = 'flex';
+    resultsView.innerHTML = '';
+    countBadge.textContent = 'Loading...';
+    refreshBtn.disabled = true;
+
+    try {
+      const endpoint = currentCategory === 'security'
+        ? '/api/admin/logs/security'
+        : '/api/admin/logs/audit';
+
+      const data = await API.get(endpoint);
+      currentLogs = Array.isArray(data) ? data : (data && Array.isArray(data.logs) ? data.logs : []);
+      renderLogTable();
+    } catch (error) {
+      currentLogs = [];
+      setLogStatus(error.message || 'Failed to load logs from server.', 'error');
+      countBadge.textContent = 'Error loading logs';
+      resultsView.innerHTML = `
+        <div class="report-card report-empty-state">
+          <div class="report-empty-icon">⚠️</div>
+          <h3>Failed to Load Logs</h3>
+          <p class="muted" style="max-width: 500px; margin: 8px auto 18px;">
+            ${escapeHtml(error.message || 'An error occurred while fetching log records. Ensure you are signed in as an administrator.')}
+          </p>
+          <button type="button" class="button button-small" id="btn-retry-logs">Retry</button>
+        </div>
+      `;
+      const retryBtn = qs('#btn-retry-logs', resultsView);
+      if (retryBtn) retryBtn.addEventListener('click', fetchLogs);
+    } finally {
+      loadingEl.style.display = 'none';
+      refreshBtn.disabled = false;
+    }
+  }
+
+  function renderLogTable() {
+    countBadge.textContent = `${currentLogs.length} total logs loaded (last 20)`;
+
+    if (!currentLogs.length) {
+      resultsView.innerHTML = `
+        <div class="report-card report-empty-state">
+          <div class="report-empty-icon">📂</div>
+          <h3>No ${currentCategory === 'security' ? 'Security' : 'Audit'} Logs Recorded</h3>
+          <p class="muted" style="max-width: 500px; margin: 8px auto 18px;">
+            There are currently no recorded ${currentCategory} log entries in the database.
+          </p>
+        </div>
+      `;
+      return;
+    }
+
+    const isAudit = currentCategory === 'audit';
+
+    resultsView.innerHTML = `
+      <div class="report-card report-table-card">
+        <div class="report-table-header">
+          <div>
+            <span class="eyebrow" style="font-size: 0.72rem;">Live Log Feed &middot; ${isAudit ? 'Audit Trail' : 'Security Events'}</span>
+            <h3 style="margin: 3px 0 0; font-size: 1.25rem;">
+              ${isAudit ? 'Audit Activity Records' : 'Security &amp; Authentication Records'}
+            </h3>
+          </div>
+          <div style="font-size: 0.85rem; color: var(--muted);">
+            Latest 20 records (Server Limited)
+          </div>
+        </div>
+
+        <div class="report-table-scroll">
+          <table class="admin-table log-custom-table">
+            <thead>
+              <tr>
+                <th style="width: 60px;">#ID</th>
+                <th style="min-width: 170px;">Timestamp</th>
+                <th style="min-width: 150px;">Event Type</th>
+                ${isAudit ? `
+                  <th style="min-width: 100px;">User</th>
+                  <th style="min-width: 130px;">Entity</th>
+                  <th>Details</th>
+                ` : `
+                  <th style="min-width: 180px;">User / Account</th>
+                  <th style="min-width: 140px;">Session ID</th>
+                  <th>Details / Reason</th>
+                `}
+                <th style="width: 70px; text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${currentLogs.map((item, idx) => {
+                const timeStr = formatDateTime(item.timestamp);
+                const badgeType = getBadgeClass(item.eventType);
+                const icon = getEventIcon(item.eventType);
+                const eventBadge = `<span class="log-badge ${badgeType}"><span>${icon}</span> ${escapeHtml(item.eventType || 'UNKNOWN')}</span>`;
+
+                if (isAudit) {
+                  const userDisplay = item.userId != null
+                    ? `<span class="badge-num" title="User ID: ${item.userId}">User #${item.userId}</span>`
+                    : '<span class="muted">System</span>';
+
+                  const entityDisplay = item.entityType
+                    ? `<span class="log-entity-tag"><strong>${escapeHtml(item.entityType.toUpperCase())}</strong> ${item.entityId != null ? `#${item.entityId}` : ''}</span>`
+                    : '<span class="muted">-</span>';
+
+                  const detailsDisplay = item.details
+                    ? `<span class="log-details-preview" title="${escapeHtml(item.details)}">${escapeHtml(item.details)}</span>`
+                    : '<span class="muted">-</span>';
+
+                  return `
+                    <tr>
+                      <td class="log-col-id">#${item.logId || idx + 1}</td>
+                      <td class="log-col-time">${escapeHtml(timeStr)}</td>
+                      <td>${eventBadge}</td>
+                      <td>${userDisplay}</td>
+                      <td>${entityDisplay}</td>
+                      <td>${detailsDisplay}</td>
+                      <td style="text-align: center;">
+                        <button type="button" class="button button-small button-light log-inspect-btn" data-log-id="${item.logId || idx}">Inspect</button>
+                      </td>
+                    </tr>
+                  `;
+                } else {
+                  // Security Log row
+                  let userEmailDisplay = '';
+                  if (item.userId != null) {
+                    userEmailDisplay += `<span class="badge-num" style="margin-right: 4px;">User #${item.userId}</span>`;
+                  }
+                  if (item.email) {
+                    userEmailDisplay += `<span class="log-email" title="${escapeHtml(item.email)}">${escapeHtml(item.email)}</span>`;
+                  }
+                  if (!userEmailDisplay) {
+                    userEmailDisplay = '<span class="muted">Anonymous / Unauthenticated</span>';
+                  }
+
+                  const sessionDisplay = item.sessionId
+                    ? `<code class="log-code log-code-session" title="${escapeHtml(item.sessionId)}">${escapeHtml(item.sessionId.length > 12 ? item.sessionId.slice(0, 10) + '...' : item.sessionId)}</code>`
+                    : '<span class="muted">-</span>';
+
+                  const detailsDisplay = item.details
+                    ? `<span class="log-details-preview" title="${escapeHtml(item.details)}">${escapeHtml(item.details)}</span>`
+                    : '<span class="muted">-</span>';
+
+                  return `
+                    <tr>
+                      <td class="log-col-id">#${item.logId || idx + 1}</td>
+                      <td class="log-col-time">${escapeHtml(timeStr)}</td>
+                      <td>${eventBadge}</td>
+                      <td>${userEmailDisplay}</td>
+                      <td>${sessionDisplay}</td>
+                      <td>${detailsDisplay}</td>
+                      <td style="text-align: center;">
+                        <button type="button" class="button button-small button-light log-inspect-btn" data-log-id="${item.logId || idx}">Inspect</button>
+                      </td>
+                    </tr>
+                  `;
+                }
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    // Wire up inspect buttons
+    resultsView.querySelectorAll('.log-inspect-btn').forEach(button => {
+      button.addEventListener('click', () => {
+        const id = button.dataset.logId;
+        const item = currentLogs.find(l => String(l.logId || '') === String(id)) || currentLogs[Number(id)] || null;
+        if (item) openInspectModal(item, isAudit);
+      });
+    });
+  }
+
+  function openInspectModal(item, isAudit) {
+    const timeStr = formatDateTime(item.timestamp);
+    const badgeType = getBadgeClass(item.eventType);
+    const icon = getEventIcon(item.eventType);
+    const jsonStr = JSON.stringify(item, null, 2);
+
+    modalContainer.innerHTML = `
+      <div class="log-modal-backdrop" id="log-modal-backdrop">
+        <div class="log-modal-content" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
+          <div class="log-modal-header">
+            <div>
+              <span class="eyebrow" style="font-size: 0.72rem;">${isAudit ? 'Audit Record' : 'Security Record'} #${item.logId || ''}</span>
+              <h3 id="log-modal-title" style="margin: 4px 0 0; display: flex; align-items: center; gap: 8px;">
+                <span>${icon}</span> ${escapeHtml(item.eventType || 'Log Detail')}
+              </h3>
+            </div>
+            <button type="button" class="log-modal-close" id="btn-close-log-modal" aria-label="Close modal">&times;</button>
+          </div>
+
+          <div class="log-modal-body">
+            <div class="log-modal-grid">
+              <div class="log-modal-field">
+                <span class="log-field-label">Log ID</span>
+                <span class="log-field-value">#${item.logId || 'N/A'}</span>
+              </div>
+              <div class="log-modal-field">
+                <span class="log-field-label">Timestamp</span>
+                <span class="log-field-value">${escapeHtml(timeStr)}</span>
+              </div>
+              <div class="log-modal-field">
+                <span class="log-field-label">Event Status</span>
+                <span class="log-field-value">
+                  <span class="log-badge ${badgeType}">${escapeHtml(item.eventType || '')}</span>
+                </span>
+              </div>
+              <div class="log-modal-field">
+                <span class="log-field-label">User ID</span>
+                <span class="log-field-value">${item.userId != null ? `User #${item.userId}` : '<span class="muted">None / System</span>'}</span>
+              </div>
+              ${isAudit ? `
+                <div class="log-modal-field">
+                  <span class="log-field-label">Entity Type</span>
+                  <span class="log-field-value">${escapeHtml(item.entityType || 'None')}</span>
+                </div>
+                <div class="log-modal-field">
+                  <span class="log-field-label">Entity ID</span>
+                  <span class="log-field-value">${item.entityId != null ? `#${item.entityId}` : 'None'}</span>
+                </div>
+              ` : `
+                <div class="log-modal-field">
+                  <span class="log-field-label">Email</span>
+                  <span class="log-field-value">${escapeHtml(item.email || 'None')}</span>
+                </div>
+                <div class="log-modal-field">
+                  <span class="log-field-label">Session ID</span>
+                  <span class="log-field-value"><code class="log-code">${escapeHtml(item.sessionId || 'None')}</code></span>
+                </div>
+              `}
+              <div class="log-modal-field wide">
+                <span class="log-field-label">Event Details / Notes</span>
+                <div class="log-field-details-box">${escapeHtml(item.details || 'No additional details provided.')}</div>
+              </div>
+            </div>
+
+            <div class="log-modal-raw-json">
+              <div class="log-raw-header">
+                <span style="font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);">Raw JSON Payload</span>
+                <button type="button" class="button button-small button-light" id="btn-copy-log-json">Copy JSON</button>
+              </div>
+              <pre class="log-json-code"><code>${escapeHtml(jsonStr)}</code></pre>
+            </div>
+          </div>
+
+          <div class="log-modal-footer">
+            <button type="button" class="button button-small" id="btn-modal-dismiss">Close</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const backdrop = qs('#log-modal-backdrop', modalContainer);
+    const closeBtn = qs('#btn-close-log-modal', modalContainer);
+    const dismissBtn = qs('#btn-modal-dismiss', modalContainer);
+    const copyBtn = qs('#btn-copy-log-json', modalContainer);
+
+    function closeModal() {
+      modalContainer.innerHTML = '';
+      document.removeEventListener('keydown', handleKeyDown);
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') closeModal();
+    }
+
+    if (backdrop) {
+      backdrop.addEventListener('click', e => {
+        if (e.target === backdrop) closeModal();
+      });
+    }
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (dismissBtn) dismissBtn.addEventListener('click', closeModal);
+    document.addEventListener('keydown', handleKeyDown);
+
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(jsonStr);
+          copyBtn.textContent = '✓ Copied!';
+          setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 2000);
+        } catch (err) {
+          copyBtn.textContent = 'Failed to copy';
+        }
+      });
+    }
+  }
+
+  // Wire controls
+  categorySelect.addEventListener('change', () => {
+    currentCategory = categorySelect.value;
+    fetchLogs();
+  });
+
+  refreshBtn.addEventListener('click', fetchLogs);
+
+  // Initial load
+  fetchLogs();
+}
+
 

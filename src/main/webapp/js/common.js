@@ -13,7 +13,11 @@ function parseDateTime(value) {
     const [year, month, day, hour = 0, minute = 0, second = 0] = value;
     return new Date(year, month - 1, day, hour, minute, second);
   }
-  const date = new Date(value);
+  let str = String(value).trim();
+  if (!str.includes('T') && str.includes(' ')) {
+    str = str.replace(' ', 'T');
+  }
+  const date = new Date(str);
   return isNaN(date.getTime()) ? null : date;
 }
 function formatDate(value) {
@@ -25,6 +29,13 @@ function formatDate(value) {
   const str = String(value).trim();
   const d = str.includes('T') ? new Date(str) : new Date(`${str}T00:00:00`);
   return isNaN(d.getTime()) ? 'Date unavailable' : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d);
+}
+
+function formatDateTime(value) {
+  if (!value) return 'Date unavailable';
+  const d = parseDateTime(value);
+  if (!d) return 'Date unavailable';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(d);
 }
 
 function formatTime(value) {
@@ -129,6 +140,10 @@ function renderHeader() {
         <a href="admin.html#reports" class="dropdown-item" role="menuitem">
           <span class="dropdown-item-icon">📊</span>
           <span class="dropdown-item-text">Business Reports</span>
+        </a>
+        <a href="admin.html#logs" class="dropdown-item" role="menuitem">
+          <span class="dropdown-item-icon">📜</span>
+          <span class="dropdown-item-text">System Logs</span>
         </a>
         <div class="dropdown-divider"></div>
         ` : ''}

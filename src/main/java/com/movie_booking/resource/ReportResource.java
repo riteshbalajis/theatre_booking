@@ -34,6 +34,7 @@ public class ReportResource {
         this.reportService = new ReportServiceImpl();
     }
 
+    
     @GET
     @Path("/theatre")
     public Response getTheatreReport(

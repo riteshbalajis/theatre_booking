@@ -32,6 +32,7 @@ import com.movie_booking.model.Booking;
 import com.movie_booking.model.BookingSeat;
 import com.movie_booking.model.Seat;
 import com.movie_booking.model.ShowSeat;
+import com.movie_booking.service.AuditService;
 import com.movie_booking.service.BookingService;
 import com.movie_booking.service.BookingServiceImpl;
 import com.movie_booking.service.SeatService;
@@ -48,10 +49,16 @@ public class BookingResource {
     private final ShowSeatService showSeatService;
     private final SeatService seatService;
 
+    private final AuditService auditService;
+
+    @Context
+    private HttpServletRequest httpRequest;
+
     public BookingResource() {
         this.bookingService = new BookingServiceImpl();
         this.showSeatService = new ShowSeatServiceImpl();
         this.seatService = new SeatServiceImpl();
+        this.auditService = new AuditService();
     }
 
     @GET
@@ -89,20 +96,24 @@ public class BookingResource {
     }
 
     @POST
-    public BookingCreatedResponse createBooking(BookTicketsRequest request) throws java.sql.SQLException{
+    public BookingCreatedResponse createBooking(BookTicketsRequest request) throws java.sql.SQLException {
 
         int userId = getAuthenticatedUserId();
-        int bookingId = bookingService.createBookingWithSeats(userId,request.getShowId(),request.getShowSeatIds());
-        
-        Booking booking = bookingService.getBookingById(userId, bookingId);
-        
-        return new BookingCreatedResponse(
-            bookingId,
-            booking.getBookingReference(),
-            "Payment Pending",
-            booking.getTotalAmount(),
-            booking.getHoldUntil());
+        int bookingId = bookingService.createBookingWithSeats(userId, request.getShowId(), request.getShowSeatIds());
 
+        Booking booking = bookingService.getBookingById(userId, bookingId);
+
+
+        //logging the booking creation event
+        auditService.logBookingCreated(bookingId, userId, request.getShowId(),
+                booking.getTotalAmount().doubleValue(), getClientIp());
+
+        return new BookingCreatedResponse(
+                bookingId,
+                booking.getBookingReference(),
+                "Payment Pending",
+                booking.getTotalAmount(),
+                booking.getHoldUntil());
 
     }
 
@@ -151,9 +162,14 @@ public class BookingResource {
                 bookingReference,
                 request);
 
+        Booking booking = bookingService.getBookingByReference(userId, bookingReference);
+
+        //logging the successful payment verification event
+        auditService.logPaymentReceived(bookingId, userId, booking.getTotalAmount().doubleValue(), "Razorpay", getClientIp());
+
         return new RazorpayVerificationResponse(
-            bookingId,
-            "Payment verified successfully. Booking confirmed.");
+                bookingId,
+                "Payment verified successfully. Booking confirmed.");
     }
 
     @DELETE
@@ -161,15 +177,18 @@ public class BookingResource {
     public Response cancelBooking(@PathParam("booking_id") int bookingId) throws java.sql.SQLException {
 
         int userId = getAuthenticatedUserId();
-        if(!bookingService.cancelBooking(userId,bookingId)){
-            throw new ResourceNotFoundException("Booking not Found with id "+bookingId);
+        if (!bookingService.cancelBooking(userId, bookingId)) {
+            throw new ResourceNotFoundException("Booking not Found with id " + bookingId);
 
         }
-        return Response
-            .ok(new MessageResponse("Booking Cancelled successfully."))
-            .build();
-    }
 
+        //logging the booking cancellation event
+
+        auditService.logBookingCancelled(bookingId, userId, "User requested", getClientIp());
+        return Response
+                .ok(new MessageResponse("Booking Cancelled successfully."))
+                .build();
+    }
 
     private BookingResponse toBookingResponse(Booking booking) {
         BookingResponse response = new BookingResponse();
@@ -186,8 +205,8 @@ public class BookingResource {
         try {
             List<BookingSeat> bookingSeats = bookingService.getBookingSeats(booking.getUserId(), booking.getBookingId());
             response.setSeats(bookingSeats.stream()
-        .map(bookingSeat -> toBookingSeatResponse(bookingSeat))
-        .collect(Collectors.toList()));
+                    .map(bookingSeat -> toBookingSeatResponse(bookingSeat))
+                    .collect(Collectors.toList()));
 
         } catch (SQLException ignored) {
             response.setSeats(List.of());
@@ -213,15 +232,15 @@ public class BookingResource {
                 }
             }
         } catch (SQLException ignored) {
-            
-            
+
         }
 
         return response;
     }
 
-    @Context
-    private HttpServletRequest httpRequest;
+    private String getClientIp() {
+        return httpRequest.getRemoteAddr();
+    }
 
     private int getAuthenticatedUserId() {
         HttpSession session = httpRequest.getSession(false);

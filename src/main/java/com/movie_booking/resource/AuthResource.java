@@ -23,6 +23,7 @@ import com.movie_booking.dto.request.RegistrationVerifyRequest;
 import com.movie_booking.dto.response.LoginResponse;
 import com.movie_booking.dto.response.RegistrationResponse;
 import com.movie_booking.dto.response.UserResponse;
+import com.movie_booking.service.AuditService;
 import com.movie_booking.service.RegistrationService;
 import com.movie_booking.service.RegistrationServiceImpl;
 import com.movie_booking.service.TotpService;
@@ -39,7 +40,8 @@ public class AuthResource {
 
     private final UserService userService;
     private final TotpService totpService;
-        private final RegistrationService registrationService;
+    private final RegistrationService registrationService;
+    private final AuditService auditService = new AuditService();
 
     @Context
     private HttpServletRequest httpRequest;
@@ -98,7 +100,6 @@ public class AuthResource {
         return Response.ok(Map.of("clientId", clientId)).build();
     }
 
-
     @POST
     @Path("/login")
     public LoginResponse login(LoginRequest request) throws SQLException {
@@ -124,6 +125,8 @@ public class AuthResource {
         session.setAttribute("userId", userId);
         response.setTotpRequired(false);
 
+        //logging the successful login event
+        auditService.logLoginSuccess(userId, request.getEmail(), getClientIp(), session.getId());
         return response;
     }
 
@@ -145,6 +148,9 @@ public class AuthResource {
                         ))
                         .build();
             }
+
+            //logging the password reset request event
+            auditService.logPasswordResetRequest(email, getClientIp());
 
             return Response.ok(
                     Map.of(
@@ -243,6 +249,10 @@ public class AuthResource {
 
             if (reset) {
 
+                //logging the successful password reset event
+
+                auditService.logPasswordResetSuccess(email, getClientIp());
+
                 return Response.ok(
                         Map.of(
                                 "message",
@@ -321,12 +331,12 @@ public class AuthResource {
     @POST
     @Path("/register")
     public Response register(RegisterRequest request)
-                        throws SQLException {
-                try {
+            throws SQLException {
+        try {
             return Response.ok(
                     registrationService.startRegistration(request))
                     .build();
-                } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException exception) {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(Map.of(
                             "message", exception.getMessage()))
@@ -337,46 +347,55 @@ public class AuthResource {
                     .entity(Map.of(
                             "message", "Unable to start registration."))
                     .build();
-                }
         }
+    }
 
-        @POST
-        @Path("/register/verify")
-        public Response verifyRegistration(RegistrationVerifyRequest request) {
-                try {
-                        RegistrationResponse response
-                                        = registrationService.verifyRegistration(request);
-                        return Response.ok(response).build();
-                } catch (IllegalArgumentException exception) {
-                        return Response.status(Response.Status.BAD_REQUEST)
-                                        .entity(Map.of(
-                                                        "message", exception.getMessage()))
-                                        .build();
-                } catch (IllegalStateException exception) {
-                        return Response.status(Response.Status.CONFLICT)
-                                        .entity(Map.of(
-                                                        "message", exception.getMessage()))
-                                        .build();
-                } catch (SQLException exception) {
-                        exception.printStackTrace();
-                        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                                        .entity(Map.of(
-                                                        "message", "Unable to verify registration."))
-                                        .build();
-                }
+    @POST
+    @Path("/register/verify")
+    public Response verifyRegistration(RegistrationVerifyRequest request) {
+        try {
+            RegistrationResponse response
+                    = registrationService.verifyRegistration(request);
+            return Response.ok(response).build();
+        } catch (IllegalArgumentException exception) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of(
+                            "message", exception.getMessage()))
+                    .build();
+        } catch (IllegalStateException exception) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of(
+                            "message", exception.getMessage()))
+                    .build();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of(
+                            "message", "Unable to verify registration."))
+                    .build();
+        }
     }
 
     @POST
     @Path("/logout")
     public Response logout() {
         HttpSession session = httpRequest.getSession(false);
+        auditService.logLogout((int) session.getAttribute("userId"), getClientIp(), session.getId());
         if (session != null) {
             session.invalidate();
         }
+
+        //logout logging
+
+       // auditService.logLogout(getAuthenticatedUserId(), getClientIp(), session.getId());
         return Response
                 .status(Response.Status.NO_CONTENT)
                 .build();
 
+    }
+
+    private String getClientIp() {
+        return httpRequest.getRemoteAddr();
     }
 
 }

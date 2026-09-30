@@ -31,6 +31,7 @@ import com.movie_booking.dto.response.MovieResponse;
 import com.movie_booking.exception.MovieNotFoundException;
 import com.movie_booking.exception.UnauthorizedException;
 import com.movie_booking.model.Movie;
+import com.movie_booking.service.AuditService;
 import com.movie_booking.service.MovieService;
 import com.movie_booking.service.MovieServiceImpl;
 
@@ -41,9 +42,14 @@ import com.movie_booking.service.MovieServiceImpl;
 public class MovieResource {
 
     private final MovieService movieService;
+    private final AuditService auditService;
+
+    @Context
+    private HttpServletRequest httpRequest;
 
     public MovieResource() {
         this.movieService = new MovieServiceImpl();
+        this.auditService = new AuditService();
     }
 
     //GET Methods 
@@ -130,6 +136,9 @@ public class MovieResource {
 
             int movieId = movieService.addMovie(movie, getAuthenticatedUserId());
 
+            //logging the movie creation event
+            auditService.logMovieCreated(movieId, movie.getTitle(), getAuthenticatedUserId(), getClientIp());
+
             return Response.status(Response.Status.CREATED)
                     .entity(toResponse(movieService.getMovieById(movieId)))
                     .build();
@@ -208,6 +217,9 @@ public class MovieResource {
 
         movieService.updateMovie(movie, getAuthenticatedUserId(), posterInputStream, originalFileName);
 
+        //logging the movie update event
+        auditService.logMovieUpdated(movieId, movie.getTitle(), getAuthenticatedUserId() , getClientIp());
+
         return Response.ok(
                 new MessageResponse("Movie updated successfully.")
         ).build();
@@ -221,13 +233,15 @@ public class MovieResource {
         if (!movieService.deactivateMovie(movieId, getAuthenticatedUserId())) {
             throw new MovieNotFoundException("Movie not found with ID: " + movieId);
         }
+
+        //logging the movie deletion event
+
+        Movie movie = movieService.getMovieById(movieId);
+        auditService.logMovieDeleted(movieId, movie.getTitle(), getAuthenticatedUserId(), getClientIp());
         return Response
                 .ok(new MessageResponse("Movie deleted successfully."))
                 .build();
     }
-
-    @Context
-    private HttpServletRequest httpRequest;
 
     private int getAuthenticatedUserId() {
 
@@ -253,6 +267,10 @@ public class MovieResource {
             response.setPosterUrl("/movie_booking/api/movies/" + movie.getMovieId() + "/poster");
         }
         return response;
+    }
+
+    private String getClientIp() {
+        return httpRequest.getRemoteAddr();
     }
 
 }
